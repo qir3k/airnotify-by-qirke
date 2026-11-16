@@ -8,10 +8,12 @@ import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.BluetoothSearching
@@ -20,6 +22,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -40,9 +43,11 @@ import com.qirke.airnotify.updater.UpdateInfo
 import kotlinx.coroutines.launch
 import java.io.File
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SettingsScreen(
-    onLanguageChanged: (String) -> Unit = {}
+    onLanguageChanged: (String) -> Unit = {},
+    onThemeChanged: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val strings = LocalStrings.current
@@ -50,6 +55,8 @@ fun SettingsScreen(
     val prefs = remember { PreferencesManager.getInstance(context) }
 
     var currentLang by remember { mutableStateOf(prefs.getAppLanguage()) }
+    var currentAccent by remember { mutableStateOf(prefs.getThemeAccent()) }
+    var currentThemeMode by remember { mutableStateOf(prefs.getThemeMode()) }
     var deviceConfig by remember { mutableStateOf(prefs.getDeviceConfig()) }
     var showScanDialog by remember { mutableStateOf(false) }
 
@@ -139,6 +146,114 @@ fun SettingsScreen(
                                     { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
                                 } else null,
                                 modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // --- THEME & ACCENT COLOR CARD ---
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.Palette,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = strings.themeCardTitle,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = strings.themeCardDesc,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Dark / Light / System Mode
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf(
+                            "system" to strings.themeModeSystem,
+                            "dark" to strings.themeModeDark,
+                            "light" to strings.themeModeLight
+                        ).forEach { (mode, label) ->
+                            FilterChip(
+                                selected = currentThemeMode == mode,
+                                onClick = {
+                                    currentThemeMode = mode
+                                    prefs.setThemeMode(mode)
+                                    onThemeChanged()
+                                },
+                                label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+                                leadingIcon = if (currentThemeMode == mode) {
+                                    { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(14.dp)) }
+                                } else null,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Text(
+                        text = strings.themeAccentTitle,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Accent chips with color dot
+                    androidx.compose.foundation.layout.FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        com.qirke.airnotify.ui.theme.AppThemeAccent.entries.forEach { accent ->
+                            val isSelected = currentAccent == accent.id
+                            FilterChip(
+                                selected = isSelected,
+                                onClick = {
+                                    currentAccent = accent.id
+                                    prefs.setThemeAccent(accent.id)
+                                    onThemeChanged()
+                                },
+                                leadingIcon = {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(12.dp)
+                                            .clip(CircleShape)
+                                            .background(accent.previewColor)
+                                    )
+                                },
+                                label = {
+                                    Text(
+                                        text = if (currentLang == "pl") accent.displayNamePl else accent.displayNameEn,
+                                        style = MaterialTheme.typography.labelSmall
+                                    )
+                                }
                             )
                         }
                     }

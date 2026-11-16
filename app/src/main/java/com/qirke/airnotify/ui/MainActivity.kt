@@ -61,10 +61,15 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             var currentLang by remember { mutableStateOf(prefs.getAppLanguage()) }
+            var currentAccent by remember { mutableStateOf(prefs.getThemeAccent()) }
+            var currentThemeMode by remember { mutableStateOf(prefs.getThemeMode()) }
             val strings = if (currentLang == "pl") PolishStrings else EnglishStrings
 
             CompositionLocalProvider(LocalStrings provides strings) {
-                AirNotifyTheme {
+                AirNotifyTheme(
+                    accentId = currentAccent,
+                    themeMode = currentThemeMode
+                ) {
                     var currentScreen by remember { mutableStateOf(Screen.DASHBOARD) }
                     val isVibrating by AirBridgeService.isVibratingFlow.collectAsState()
                     val liveStatus by AirBridgeService.currentStatusFlow.collectAsState()
@@ -162,7 +167,13 @@ class MainActivity : ComponentActivity() {
                                 Screen.DASHBOARD -> DashboardScreen(onNavigateToSettings = { currentScreen = Screen.SETTINGS })
                                 Screen.APPS -> AppsScreen()
                                 Screen.CALLS_CHIME -> CallsChimeScreen()
-                                Screen.SETTINGS -> SettingsScreen(onLanguageChanged = { currentLang = it })
+                                Screen.SETTINGS -> SettingsScreen(
+                                    onLanguageChanged = { currentLang = it },
+                                    onThemeChanged = {
+                                        currentAccent = prefs.getThemeAccent()
+                                        currentThemeMode = prefs.getThemeMode()
+                                    }
+                                )
                             }
                         }
                     }

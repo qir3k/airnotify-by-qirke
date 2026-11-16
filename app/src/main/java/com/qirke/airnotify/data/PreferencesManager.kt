@@ -27,6 +27,8 @@ class PreferencesManager(context: Context) {
         private const val KEY_ONLY_WHEN_SCREEN_OFF_CALLS = "only_screen_off_calls"
         private const val KEY_ALERT_ONLY_WHEN_SCREEN_OFF = "alert_only_when_screen_off"
         private const val KEY_APP_LANGUAGE = "app_language"
+        private const val KEY_THEME_ACCENT = "theme_accent"
+        private const val KEY_THEME_MODE = "theme_mode"
         private const val KEY_DEFAULT_RULES_DISABLED_V1 = "default_rules_disabled_v1"
 
         @Volatile
@@ -222,6 +224,20 @@ class PreferencesManager(context: Context) {
 
     fun setAppLanguage(lang: String) {
         prefs.edit().putString(KEY_APP_LANGUAGE, lang).apply()
+    }
+
+    fun getThemeAccent(): String =
+        prefs.getString(KEY_THEME_ACCENT, "system") ?: "system"
+
+    fun setThemeAccent(accent: String) {
+        prefs.edit().putString(KEY_THEME_ACCENT, accent).apply()
+    }
+
+    fun getThemeMode(): String =
+        prefs.getString(KEY_THEME_MODE, "system") ?: "system"
+
+    fun setThemeMode(mode: String) {
+        prefs.edit().putString(KEY_THEME_MODE, mode).apply()
     }
 
     fun isOnlyWhenScreenOffEnabled(): Boolean =
