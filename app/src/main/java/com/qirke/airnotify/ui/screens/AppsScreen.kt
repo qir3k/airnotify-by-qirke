@@ -134,7 +134,7 @@ fun AppsScreen() {
                 val newRule = AppRule(
                     packageName = pkgName,
                     appName = appName,
-                    isEnabled = true,
+                    isEnabled = false,
                     pattern = AirHapticPattern.DOUBLE,
                     filterMode = FilterMode.ALL_NOTIFICATIONS,
                     favoritePersons = emptyList()
@@ -387,7 +387,7 @@ fun EditAppRuleDialog(
                             }
 
                             Text(
-                                text = "e.g. 'Mis' matches 'Misica', 'Miś', or '❤️ Misica ❤️' (matches words, emotes & substrings)",
+                                text = "e.g. 'Mis' matches 'Misica', 'Miś' (case, diacritic and symbol insensitive)",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(bottom = 8.dp)

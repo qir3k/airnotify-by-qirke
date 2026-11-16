@@ -32,7 +32,7 @@ class PhoneCallReceiver : BroadcastReceiver() {
                 }
 
                 // Check screen off / phone in use filter for calls
-                if (prefs.isOnlyWhenScreenOffForCalls() && com.qirke.airnotify.util.DeviceStateHelper.isPhoneInActiveUse(context)) {
+                if (prefs.isOnlyWhenScreenOffEnabled() && com.qirke.airnotify.util.DeviceStateHelper.isPhoneInActiveUse(context)) {
                     Timber.d("Incoming call vibration skipped: phone is actively in use (unlocked)")
                     prefs.addLog("Call", "Skipped band vibration (phone is in active use)")
                     return

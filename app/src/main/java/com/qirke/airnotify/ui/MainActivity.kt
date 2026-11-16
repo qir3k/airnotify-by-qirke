@@ -24,6 +24,9 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.qirke.airnotify.data.PreferencesManager
 import com.qirke.airnotify.service.AirBridgeService
+import com.qirke.airnotify.ui.i18n.EnglishStrings
+import com.qirke.airnotify.ui.i18n.LocalStrings
+import com.qirke.airnotify.ui.i18n.PolishStrings
 import com.qirke.airnotify.ui.screens.AppsScreen
 import com.qirke.airnotify.ui.screens.CallsChimeScreen
 import com.qirke.airnotify.ui.screens.DashboardScreen
@@ -57,99 +60,110 @@ class MainActivity : ComponentActivity() {
         val prefs = PreferencesManager.getInstance(this)
 
         setContent {
-            AirNotifyTheme {
-                var currentScreen by remember { mutableStateOf(Screen.DASHBOARD) }
-                val isVibrating by AirBridgeService.isVibratingFlow.collectAsState()
-                val liveStatus by AirBridgeService.currentStatusFlow.collectAsState()
-                var deviceConfig by remember { mutableStateOf(prefs.getDeviceConfig()) }
+            var currentLang by remember { mutableStateOf(prefs.getAppLanguage()) }
+            val strings = if (currentLang == "pl") PolishStrings else EnglishStrings
 
-                LaunchedEffect(liveStatus) {
-                    deviceConfig = prefs.getDeviceConfig()
-                }
+            CompositionLocalProvider(LocalStrings provides strings) {
+                AirNotifyTheme {
+                    var currentScreen by remember { mutableStateOf(Screen.DASHBOARD) }
+                    val isVibrating by AirBridgeService.isVibratingFlow.collectAsState()
+                    val liveStatus by AirBridgeService.currentStatusFlow.collectAsState()
+                    var deviceConfig by remember { mutableStateOf(prefs.getDeviceConfig()) }
 
-                Scaffold(
-                    modifier = Modifier.fillMaxSize(),
-                    topBar = {
-                        TopAppBar(
-                            title = {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Text(
-                                        text = "AirNotify",
-                                        fontWeight = FontWeight.Bold,
-                                        style = MaterialTheme.typography.titleLarge
-                                    )
-                                    Spacer(modifier = Modifier.width(10.dp))
-                                    Surface(
-                                        shape = CircleShape,
-                                        color = if (deviceConfig.address != null) {
-                                            if (isVibrating) MaterialTheme.colorScheme.primaryContainer else StatusGreen.copy(alpha = 0.2f)
-                                        } else StatusRed.copy(alpha = 0.2f)
+                    LaunchedEffect(liveStatus) {
+                        deviceConfig = prefs.getDeviceConfig()
+                    }
+
+                    Scaffold(
+                        modifier = Modifier.fillMaxSize(),
+                        topBar = {
+                            TopAppBar(
+                                title = {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.fillMaxWidth()
                                     ) {
-                                        Row(
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                            verticalAlignment = Alignment.CenterVertically
+                                        Text(
+                                            text = "AirNotify",
+                                            fontWeight = FontWeight.Bold,
+                                            style = MaterialTheme.typography.titleLarge
+                                        )
+                                        Spacer(modifier = Modifier.width(10.dp))
+                                        Surface(
+                                            shape = CircleShape,
+                                            color = if (deviceConfig.address != null) {
+                                                if (isVibrating) MaterialTheme.colorScheme.primaryContainer else StatusGreen.copy(alpha = 0.2f)
+                                            } else StatusRed.copy(alpha = 0.2f)
                                         ) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(8.dp)
-                                                    .clip(CircleShape)
-                                                    .background(if (deviceConfig.address != null) StatusGreen else StatusRed)
-                                            )
-                                            Spacer(modifier = Modifier.width(6.dp))
-                                            Text(
-                                                text = if (deviceConfig.address != null) {
-                                                    if (isVibrating) "Pulsing..." else "Paired"
-                                                } else "Not Paired",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                fontWeight = FontWeight.SemiBold
-                                            )
+                                            Row(
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(8.dp)
+                                                        .clip(CircleShape)
+                                                        .background(if (deviceConfig.address != null) StatusGreen else StatusRed)
+                                                )
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text(
+                                                    text = if (deviceConfig.address != null) {
+                                                        if (isVibrating) "Pulsing..." else strings.connected
+                                                    } else strings.disconnected,
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    fontWeight = FontWeight.SemiBold
+                                                )
+                                            }
                                         }
                                     }
-                                }
-                            },
-                            colors = TopAppBarDefaults.topAppBarColors(
-                                containerColor = MaterialTheme.colorScheme.surface
-                            )
-                        )
-                    },
-                    bottomBar = {
-                        NavigationBar {
-                            Screen.values().forEach { screen ->
-                                NavigationBarItem(
-                                    selected = currentScreen == screen,
-                                    onClick = { currentScreen = screen },
-                                    icon = {
-                                        Icon(
-                                            imageVector = screen.icon,
-                                            contentDescription = screen.title
-                                        )
-                                    },
-                                    label = {
-                                        Text(
-                                            text = screen.navLabel,
-                                            maxLines = 1,
-                                            style = MaterialTheme.typography.labelSmall
-                                        )
-                                    },
-                                    alwaysShowLabel = true
+                                },
+                                colors = TopAppBarDefaults.topAppBarColors(
+                                    containerColor = MaterialTheme.colorScheme.surface
                                 )
+                            )
+                        },
+                        bottomBar = {
+                            NavigationBar {
+                                Screen.values().forEach { screen ->
+                                    val label = when (screen) {
+                                        Screen.DASHBOARD -> strings.navDashboard
+                                        Screen.APPS -> strings.navApps
+                                        Screen.CALLS_CHIME -> strings.navCalls
+                                        Screen.SETTINGS -> strings.navSettings
+                                    }
+                                    NavigationBarItem(
+                                        selected = currentScreen == screen,
+                                        onClick = { currentScreen = screen },
+                                        icon = {
+                                            Icon(
+                                                imageVector = screen.icon,
+                                                contentDescription = label
+                                            )
+                                        },
+                                        label = {
+                                            Text(
+                                                text = label,
+                                                maxLines = 1,
+                                                style = MaterialTheme.typography.labelSmall
+                                            )
+                                        },
+                                        alwaysShowLabel = true
+                                    )
+                                }
                             }
                         }
-                    }
-                ) { padding ->
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(padding)
-                    ) {
-                        when (currentScreen) {
-                            Screen.DASHBOARD -> DashboardScreen(onNavigateToSettings = { currentScreen = Screen.SETTINGS })
-                            Screen.APPS -> AppsScreen()
-                            Screen.CALLS_CHIME -> CallsChimeScreen()
-                            Screen.SETTINGS -> SettingsScreen()
+                    ) { padding ->
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(padding)
+                        ) {
+                            when (currentScreen) {
+                                Screen.DASHBOARD -> DashboardScreen(onNavigateToSettings = { currentScreen = Screen.SETTINGS })
+                                Screen.APPS -> AppsScreen()
+                                Screen.CALLS_CHIME -> CallsChimeScreen()
+                                Screen.SETTINGS -> SettingsScreen(onLanguageChanged = { currentLang = it })
+                            }
                         }
                     }
                 }

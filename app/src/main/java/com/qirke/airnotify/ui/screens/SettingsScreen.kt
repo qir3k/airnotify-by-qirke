@@ -31,6 +31,8 @@ import com.qirke.airnotify.ble.DiscoveredDevice
 import com.qirke.airnotify.data.ContactHelper
 import com.qirke.airnotify.data.PreferencesManager
 import com.qirke.airnotify.service.AirNotificationListenerService
+import com.qirke.airnotify.ui.i18n.AppLanguage
+import com.qirke.airnotify.ui.i18n.LocalStrings
 import com.qirke.airnotify.ui.theme.StatusGreen
 import com.qirke.airnotify.ui.theme.StatusRed
 import com.qirke.airnotify.updater.InAppUpdater
@@ -39,11 +41,15 @@ import kotlinx.coroutines.launch
 import java.io.File
 
 @Composable
-fun SettingsScreen() {
+fun SettingsScreen(
+    onLanguageChanged: (String) -> Unit = {}
+) {
     val context = LocalContext.current
+    val strings = LocalStrings.current
     val scope = rememberCoroutineScope()
     val prefs = remember { PreferencesManager.getInstance(context) }
 
+    var currentLang by remember { mutableStateOf(prefs.getAppLanguage()) }
     var deviceConfig by remember { mutableStateOf(prefs.getDeviceConfig()) }
     var showScanDialog by remember { mutableStateOf(false) }
 
@@ -56,8 +62,7 @@ fun SettingsScreen() {
     var downloadedApk by remember { mutableStateOf<File?>(null) }
     var autoCheckUpdates by remember { mutableStateOf(prefs.isAutoCheckUpdatesEnabled()) }
     var coexistenceGuard by remember { mutableStateOf(prefs.isCoexistenceGuardEnabled()) }
-    var onlyScreenOffNotifications by remember { mutableStateOf(prefs.isOnlyWhenScreenOffForNotifications()) }
-    var onlyScreenOffCalls by remember { mutableStateOf(prefs.isOnlyWhenScreenOffForCalls()) }
+    var onlyScreenOff by remember { mutableStateOf(prefs.isOnlyWhenScreenOffEnabled()) }
 
     LazyColumn(
         modifier = Modifier
@@ -68,16 +73,77 @@ fun SettingsScreen() {
     ) {
         item {
             Text(
-                text = "Settings & Updates",
+                text = strings.settingsTitle,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = "Device pairing, in-app updates, and system permissions.",
+                text = strings.settingsSubtitle,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 4.dp)
             )
+        }
+
+        // --- LANGUAGE SELECTOR CARD ---
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.Language,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = strings.languageCardTitle,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = strings.languageCardDesc,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        AppLanguage.entries.forEach { lang ->
+                            FilterChip(
+                                selected = currentLang == lang.code,
+                                onClick = {
+                                    currentLang = lang.code
+                                    prefs.setAppLanguage(lang.code)
+                                    onLanguageChanged(lang.code)
+                                },
+                                label = { Text(lang.displayName) },
+                                leadingIcon = if (currentLang == lang.code) {
+                                    { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                                } else null,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                }
+            }
         }
 
         // --- IN-APP UPDATER CARD ---
@@ -416,13 +482,15 @@ fun SettingsScreen() {
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(20.dp)
             ) {
-                Column(
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(20.dp)
+                        .padding(20.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.weight(1f),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
@@ -430,99 +498,30 @@ fun SettingsScreen() {
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary
                         )
-                        Spacer(modifier = Modifier.width(10.dp))
+                        Spacer(modifier = Modifier.width(12.dp))
                         Column {
                             Text(
-                                text = "Alert Only When Screen is Off",
+                                text = strings.screenOffOnlyTitle,
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "Vibrate band only when phone is locked or in pocket",
+                                text = if (onlyScreenOff) strings.screenOffOnlyDesc else strings.screenOffOnlySubtitle,
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text(
-                        text = "Prevents duplicate alerts on your wrist while you are actively holding and using your phone. Saves band battery.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    Spacer(modifier = Modifier.width(12.dp))
+
+                    Switch(
+                        checked = onlyScreenOff,
+                        onCheckedChange = {
+                            onlyScreenOff = it
+                            prefs.setOnlyWhenScreenOffEnabled(it)
+                        }
                     )
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    // Notifications Toggle
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                val next = !onlyScreenOffNotifications
-                                onlyScreenOffNotifications = next
-                                prefs.setOnlyWhenScreenOffForNotifications(next)
-                            }
-                            .padding(vertical = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "App Notifications",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Text(
-                                text = if (onlyScreenOffNotifications) "Vibrates only when phone is not in use" else "Always vibrates on every notification",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Switch(
-                            checked = onlyScreenOffNotifications,
-                            onCheckedChange = {
-                                onlyScreenOffNotifications = it
-                                prefs.setOnlyWhenScreenOffForNotifications(it)
-                            }
-                        )
-                    }
-
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-
-                    // Calls Toggle
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                val next = !onlyScreenOffCalls
-                                onlyScreenOffCalls = next
-                                prefs.setOnlyWhenScreenOffForCalls(next)
-                            }
-                            .padding(vertical = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Incoming Phone Calls",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Text(
-                                text = if (onlyScreenOffCalls) "Vibrates only when phone is not in use" else "Always vibrates for incoming calls",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Switch(
-                            checked = onlyScreenOffCalls,
-                            onCheckedChange = {
-                                onlyScreenOffCalls = it
-                                prefs.setOnlyWhenScreenOffForCalls(it)
-                            }
-                        )
-                    }
                 }
             }
         }

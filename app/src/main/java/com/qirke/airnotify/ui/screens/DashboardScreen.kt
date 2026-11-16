@@ -26,6 +26,7 @@ import com.qirke.airnotify.model.DeviceConfig
 import com.qirke.airnotify.model.LogEntry
 import com.qirke.airnotify.service.AirBridgeService
 import com.qirke.airnotify.service.AirNotificationTrigger
+import com.qirke.airnotify.ui.i18n.LocalStrings
 import com.qirke.airnotify.ui.theme.StatusGreen
 import com.qirke.airnotify.ui.theme.StatusRed
 import java.text.SimpleDateFormat
@@ -37,14 +38,14 @@ fun DashboardScreen(
     onNavigateToSettings: () -> Unit
 ) {
     val context = LocalContext.current
+    val strings = LocalStrings.current
     val prefs = remember { PreferencesManager.getInstance(context) }
 
     var deviceConfig by remember { mutableStateOf(prefs.getDeviceConfig()) }
     var logs by remember { mutableStateOf(prefs.getLogs()) }
     var isSyncPaused by remember { mutableStateOf(prefs.isSyncPaused()) }
     var quietConfig by remember { mutableStateOf(prefs.getQuietHoursConfig()) }
-    var onlyScreenOffNotifications by remember { mutableStateOf(prefs.isOnlyWhenScreenOffForNotifications()) }
-    var onlyScreenOffCalls by remember { mutableStateOf(prefs.isOnlyWhenScreenOffForCalls()) }
+    var onlyScreenOff by remember { mutableStateOf(prefs.isOnlyWhenScreenOffEnabled()) }
     val installedHealthApps = remember { BleCoexistenceManager.findInstalledHealthApps(context) }
 
     val isVibrating by AirBridgeService.isVibratingFlow.collectAsState()
@@ -56,8 +57,7 @@ fun DashboardScreen(
         deviceConfig = prefs.getDeviceConfig()
         isSyncPaused = prefs.isSyncPaused()
         quietConfig = prefs.getQuietHoursConfig()
-        onlyScreenOffNotifications = prefs.isOnlyWhenScreenOffForNotifications()
-        onlyScreenOffCalls = prefs.isOnlyWhenScreenOffForCalls()
+        onlyScreenOff = prefs.isOnlyWhenScreenOffEnabled()
     }
 
     LazyColumn(
@@ -275,13 +275,13 @@ fun DashboardScreen(
                         ) {
                             Column(modifier = Modifier.padding(12.dp)) {
                                 Text(
-                                    text = "🌙 Silenced between ${String.format("%02d:00", quietConfig.startHour)} and ${String.format("%02d:00", quietConfig.endHour)}",
+                                    text = String.format(strings.silencedBetween, String.format("%02d:00", quietConfig.startHour), String.format("%02d:00", quietConfig.endHour)),
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.onSecondaryContainer
                                 )
                                 Text(
-                                    text = "☀️ Active at all other times (${String.format("%02d:00", quietConfig.endHour)} - ${String.format("%02d:00", quietConfig.startHour)})",
+                                    text = String.format(strings.activeAtOtherTimes, String.format("%02d:00", quietConfig.endHour), String.format("%02d:00", quietConfig.startHour)),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f),
                                     modifier = Modifier.padding(top = 2.dp)
@@ -410,107 +410,41 @@ fun DashboardScreen(
             }
         }
 
-        // Screen State & Pocket Mode Card
+        // Screen State & Pocket Mode Card (Clean single card)
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp)
+                shape = RoundedCornerShape(16.dp)
             ) {
-                Column(
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(20.dp)
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            Icons.Default.PhoneAndroid,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = strings.screenOffOnlyTitle,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
                         )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Column {
-                            Text(
-                                text = "Alert Only When Screen is Off",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = if (onlyScreenOffNotifications && onlyScreenOffCalls) {
-                                    "Active (skips vibration while using phone)"
-                                } else if (onlyScreenOffNotifications || onlyScreenOffCalls) {
-                                    "Partially active"
-                                } else {
-                                    "Always vibrates (even when screen is in use)"
-                                },
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                        Text(
+                            text = if (onlyScreenOff) strings.screenOffOnlyDesc else strings.screenOffOnlySubtitle,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(12.dp))
+
+                    Switch(
+                        checked = onlyScreenOff,
+                        onCheckedChange = {
+                            onlyScreenOff = it
+                            prefs.setOnlyWhenScreenOffEnabled(it)
                         }
-                    }
-
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text(
-                        text = "Vibrates your band only when your phone is locked or in your pocket. Skips vibrations when you are actively using your phone so you don't get interrupted.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                val next = !onlyScreenOffNotifications
-                                onlyScreenOffNotifications = next
-                                prefs.setOnlyWhenScreenOffForNotifications(next)
-                            }
-                            .padding(vertical = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Mute app notifications when screen is active",
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Switch(
-                            checked = onlyScreenOffNotifications,
-                            onCheckedChange = {
-                                onlyScreenOffNotifications = it
-                                prefs.setOnlyWhenScreenOffForNotifications(it)
-                            }
-                        )
-                    }
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                val next = !onlyScreenOffCalls
-                                onlyScreenOffCalls = next
-                                prefs.setOnlyWhenScreenOffForCalls(next)
-                            }
-                            .padding(vertical = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Mute incoming calls when phone is in use",
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Switch(
-                            checked = onlyScreenOffCalls,
-                            onCheckedChange = {
-                                onlyScreenOffCalls = it
-                                prefs.setOnlyWhenScreenOffForCalls(it)
-                            }
-                        )
-                    }
                 }
             }
         }

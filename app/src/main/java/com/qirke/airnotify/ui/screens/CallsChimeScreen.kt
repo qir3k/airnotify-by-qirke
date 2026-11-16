@@ -20,17 +20,18 @@ import com.qirke.airnotify.data.PreferencesManager
 import com.qirke.airnotify.model.FilterMode
 import com.qirke.airnotify.service.AirBridgeService
 import com.qirke.airnotify.service.AirNotificationTrigger
+import com.qirke.airnotify.ui.i18n.LocalStrings
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun CallsChimeScreen() {
     val context = LocalContext.current
+    val strings = LocalStrings.current
     val prefs = remember { PreferencesManager.getInstance(context) }
 
     var quietConfig by remember { mutableStateOf(prefs.getQuietHoursConfig()) }
     var chimeConfig by remember { mutableStateOf(prefs.getHourlyChimeConfig()) }
     var callConfig by remember { mutableStateOf(prefs.getCallConfig()) }
-    var onlyWhenScreenOffForCalls by remember { mutableStateOf(prefs.isOnlyWhenScreenOffForCalls()) }
 
     var newCallerText by remember { mutableStateOf("") }
     var showContactPicker by remember { mutableStateOf(false) }
@@ -295,40 +296,6 @@ fun CallsChimeScreen() {
                                 onCheckedChange = {
                                     callConfig = callConfig.copy(isContinuous = it)
                                     saveCall()
-                                }
-                            )
-                        }
-
-                        // Alert only when screen is off toggle
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    val next = !onlyWhenScreenOffForCalls
-                                    onlyWhenScreenOffForCalls = next
-                                    prefs.setOnlyWhenScreenOffForCalls(next)
-                                }
-                                .padding(vertical = 4.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Only When Screen Off / Locked",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Text(
-                                    text = "Vibrates only if phone is not in active use",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            Switch(
-                                checked = onlyWhenScreenOffForCalls,
-                                onCheckedChange = {
-                                    onlyWhenScreenOffForCalls = it
-                                    prefs.setOnlyWhenScreenOffForCalls(it)
                                 }
                             )
                         }

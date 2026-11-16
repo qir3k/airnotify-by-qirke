@@ -59,7 +59,7 @@ class AirNotificationListenerService : NotificationListenerService() {
         }
 
         // Skip vibration if phone is actively in use (screen is on and unlocked)
-        if (prefs.isOnlyWhenScreenOffForNotifications() && com.qirke.airnotify.util.DeviceStateHelper.isPhoneInActiveUse(this)) {
+        if (prefs.isOnlyWhenScreenOffEnabled() && com.qirke.airnotify.util.DeviceStateHelper.isPhoneInActiveUse(this)) {
             Timber.d("Notification muted: phone is currently in active use (screen unlocked)")
             return
         }

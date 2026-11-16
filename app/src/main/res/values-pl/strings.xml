@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AirNotify</string>
+    <string name="notification_service_name">Usługa nasłuchiwania powiadomień AirNotify</string>
+    <string name="notification_channel_name">Usługa w tle AirNotify</string>
+    <string name="notification_channel_desc">Pokazuje aktywny stan połączenia z opaską Fitbit Air</string>
+    <string name="chime_channel_name">Cogodzinny dzwonek AirNotify</string>
+    <string name="chime_channel_desc">Przypomnienia wibracyjne o pełnych godzinach</string>
+</resources>

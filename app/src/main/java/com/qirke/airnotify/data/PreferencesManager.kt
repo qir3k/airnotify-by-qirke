@@ -25,6 +25,9 @@ class PreferencesManager(context: Context) {
         private const val KEY_COEXISTENCE_GUARD = "coexistence_guard"
         private const val KEY_ONLY_WHEN_SCREEN_OFF_NOTIFICATIONS = "only_screen_off_notifications"
         private const val KEY_ONLY_WHEN_SCREEN_OFF_CALLS = "only_screen_off_calls"
+        private const val KEY_ALERT_ONLY_WHEN_SCREEN_OFF = "alert_only_when_screen_off"
+        private const val KEY_APP_LANGUAGE = "app_language"
+        private const val KEY_DEFAULT_RULES_DISABLED_V1 = "default_rules_disabled_v1"
 
         @Volatile
         private var instance: PreferencesManager? = null
@@ -35,12 +38,12 @@ class PreferencesManager(context: Context) {
             }
     }
 
-    // Default pre-populated apps
+    // Default pre-populated apps (all disabled by default, user enables manually)
     private val defaultRules = listOf(
         AppRule(
             packageName = "com.facebook.orca",
             appName = "Messenger",
-            isEnabled = true,
+            isEnabled = false,
             pattern = AirHapticPattern.DOUBLE,
             filterMode = FilterMode.ALL_NOTIFICATIONS,
             favoritePersons = emptyList()
@@ -48,7 +51,7 @@ class PreferencesManager(context: Context) {
         AppRule(
             packageName = "com.whatsapp",
             appName = "WhatsApp",
-            isEnabled = true,
+            isEnabled = false,
             pattern = AirHapticPattern.DOUBLE,
             filterMode = FilterMode.ALL_NOTIFICATIONS,
             favoritePersons = emptyList()
@@ -56,7 +59,7 @@ class PreferencesManager(context: Context) {
         AppRule(
             packageName = "org.telegram.messenger",
             appName = "Telegram",
-            isEnabled = true,
+            isEnabled = false,
             pattern = AirHapticPattern.SINGLE,
             filterMode = FilterMode.ALL_NOTIFICATIONS,
             favoritePersons = emptyList()
@@ -64,7 +67,7 @@ class PreferencesManager(context: Context) {
         AppRule(
             packageName = "com.google.android.apps.messaging",
             appName = "Messages (SMS)",
-            isEnabled = true,
+            isEnabled = false,
             pattern = AirHapticPattern.SINGLE,
             filterMode = FilterMode.ALL_NOTIFICATIONS,
             favoritePersons = emptyList()
@@ -72,7 +75,7 @@ class PreferencesManager(context: Context) {
         AppRule(
             packageName = "com.instagram.android",
             appName = "Instagram",
-            isEnabled = true,
+            isEnabled = false,
             pattern = AirHapticPattern.SINGLE,
             filterMode = FilterMode.ALL_NOTIFICATIONS,
             favoritePersons = emptyList()
@@ -80,6 +83,21 @@ class PreferencesManager(context: Context) {
     )
 
     fun getAppRules(): List<AppRule> {
+        if (!prefs.getBoolean(KEY_DEFAULT_RULES_DISABLED_V1, false)) {
+            prefs.edit().putBoolean(KEY_DEFAULT_RULES_DISABLED_V1, true).apply()
+            val existing = prefs.getString(KEY_APP_RULES, null)
+            if (existing != null) {
+                try {
+                    val type = object : TypeToken<List<AppRule>>() {}.type
+                    val list = gson.fromJson<List<AppRule>>(existing, type)
+                    if (list != null) {
+                        val updated = list.map { it.copy(isEnabled = false) }
+                        saveAppRules(updated)
+                        return updated
+                    }
+                } catch (_: Exception) {}
+            }
+        }
         val json = prefs.getString(KEY_APP_RULES, null) ?: return defaultRules
         return try {
             val type = object : TypeToken<List<AppRule>>() {}.type
@@ -195,19 +213,34 @@ class PreferencesManager(context: Context) {
         prefs.edit().putBoolean(KEY_COEXISTENCE_GUARD, enabled).apply()
     }
 
-    fun isOnlyWhenScreenOffForNotifications(): Boolean =
-        prefs.getBoolean(KEY_ONLY_WHEN_SCREEN_OFF_NOTIFICATIONS, true)
-
-    fun setOnlyWhenScreenOffForNotifications(enabled: Boolean) {
-        prefs.edit().putBoolean(KEY_ONLY_WHEN_SCREEN_OFF_NOTIFICATIONS, enabled).apply()
+    fun getAppLanguage(): String {
+        return prefs.getString(KEY_APP_LANGUAGE, null) ?: run {
+            val sys = java.util.Locale.getDefault().language
+            if (sys.equals("pl", ignoreCase = true)) "pl" else "en"
+        }
     }
 
-    fun isOnlyWhenScreenOffForCalls(): Boolean =
-        prefs.getBoolean(KEY_ONLY_WHEN_SCREEN_OFF_CALLS, true)
-
-    fun setOnlyWhenScreenOffForCalls(enabled: Boolean) {
-        prefs.edit().putBoolean(KEY_ONLY_WHEN_SCREEN_OFF_CALLS, enabled).apply()
+    fun setAppLanguage(lang: String) {
+        prefs.edit().putString(KEY_APP_LANGUAGE, lang).apply()
     }
+
+    fun isOnlyWhenScreenOffEnabled(): Boolean =
+        prefs.getBoolean(KEY_ALERT_ONLY_WHEN_SCREEN_OFF, true)
+
+    fun setOnlyWhenScreenOffEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_ALERT_ONLY_WHEN_SCREEN_OFF, enabled)
+            .putBoolean(KEY_ONLY_WHEN_SCREEN_OFF_NOTIFICATIONS, enabled)
+            .putBoolean(KEY_ONLY_WHEN_SCREEN_OFF_CALLS, enabled)
+            .apply()
+    }
+
+    fun isOnlyWhenScreenOffForNotifications(): Boolean = isOnlyWhenScreenOffEnabled()
+
+    fun setOnlyWhenScreenOffForNotifications(enabled: Boolean) = setOnlyWhenScreenOffEnabled(enabled)
+
+    fun isOnlyWhenScreenOffForCalls(): Boolean = isOnlyWhenScreenOffEnabled()
+
+    fun setOnlyWhenScreenOffForCalls(enabled: Boolean) = setOnlyWhenScreenOffEnabled(enabled)
 
     fun pauseForSync(durationMinutes: Int = 5) {
         val until = System.currentTimeMillis() + (durationMinutes * 60_000L)
