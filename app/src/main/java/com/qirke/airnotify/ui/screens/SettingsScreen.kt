@@ -12,7 +12,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -23,19 +22,19 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import androidx.core.content.ContextCompat
 import com.qirke.airnotify.BuildConfig
-import com.qirke.airnotify.ble.BleScanner
-import com.qirke.airnotify.ble.DiscoveredDevice
 import com.qirke.airnotify.data.ContactHelper
 import com.qirke.airnotify.data.PreferencesManager
 import com.qirke.airnotify.service.AirNotificationListenerService
+import com.qirke.airnotify.ui.components.BleScanDialog
 import com.qirke.airnotify.ui.i18n.AppLanguage
 import com.qirke.airnotify.ui.i18n.LocalStrings
+import com.qirke.airnotify.ui.theme.AppThemeAccent
 import com.qirke.airnotify.ui.theme.StatusGreen
 import com.qirke.airnotify.ui.theme.StatusRed
 import com.qirke.airnotify.updater.InAppUpdater
@@ -58,6 +57,7 @@ fun SettingsScreen(
     var currentAccent by remember { mutableStateOf(prefs.getThemeAccent()) }
     var currentThemeMode by remember { mutableStateOf(prefs.getThemeMode()) }
     var deviceConfig by remember { mutableStateOf(prefs.getDeviceConfig()) }
+    var quietConfig by remember { mutableStateOf(prefs.getQuietHoursConfig()) }
     var showScanDialog by remember { mutableStateOf(false) }
 
     // Updater State
@@ -92,7 +92,110 @@ fun SettingsScreen(
             )
         }
 
-        // --- LANGUAGE SELECTOR CARD ---
+        // --- 1. FITBIT AIR DEVICE PAIRING CARD (Prominently at the top) ---
+        item {
+            ElevatedCard(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Watch, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                text = strings.fitbitAirDeviceTitle,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .size(12.dp)
+                                .clip(CircleShape)
+                                .background(if (deviceConfig.address != null) StatusGreen else StatusRed)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    if (deviceConfig.address != null) {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                Text(
+                                    text = deviceConfig.name,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "${strings.address}: ${deviceConfig.address}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = { showScanDialog = true },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(Icons.Default.BluetoothSearching, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(strings.changeBand)
+                            }
+
+                            TextButton(
+                                onClick = {
+                                    prefs.saveDeviceConfig(deviceConfig.copy(address = null))
+                                    deviceConfig = prefs.getDeviceConfig()
+                                },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(strings.forgetBand, color = MaterialTheme.colorScheme.error)
+                            }
+                        }
+                    } else {
+                        Text(
+                            text = strings.pairPrompt,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Button(
+                            onClick = { showScanDialog = true },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.BluetoothSearching, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(strings.scanForFitbitAir)
+                        }
+                    }
+                }
+            }
+        }
+
+        // --- 2. LANGUAGE SELECTOR CARD ---
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -134,16 +237,30 @@ fun SettingsScreen(
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         AppLanguage.entries.forEach { lang ->
+                            val isSelected = currentLang.equals(lang.code, ignoreCase = true)
                             FilterChip(
-                                selected = currentLang == lang.code,
+                                selected = isSelected,
                                 onClick = {
-                                    currentLang = lang.code
-                                    prefs.setAppLanguage(lang.code)
-                                    onLanguageChanged(lang.code)
+                                    if (!isSelected) {
+                                        currentLang = lang.code
+                                        prefs.setAppLanguage(lang.code)
+                                        onLanguageChanged(lang.code)
+                                    }
                                 },
-                                label = { Text(lang.displayName) },
-                                leadingIcon = if (currentLang == lang.code) {
-                                    { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                                label = {
+                                    Text(
+                                        text = lang.displayName,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                },
+                                leadingIcon = if (isSelected) {
+                                    {
+                                        Icon(
+                                            Icons.Default.Check,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
                                 } else null,
                                 modifier = Modifier.weight(1f)
                             )
@@ -153,7 +270,7 @@ fun SettingsScreen(
             }
         }
 
-        // --- THEME & ACCENT COLOR CARD ---
+        // --- 3. THEME & APPEARANCE (DYNAMIC COLOR & ACCENTS) ---
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -190,7 +307,7 @@ fun SettingsScreen(
 
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    // Dark / Light / System Mode
+                    // Dark / Light / System Mode Chips
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -200,23 +317,29 @@ fun SettingsScreen(
                             "dark" to strings.themeModeDark,
                             "light" to strings.themeModeLight
                         ).forEach { (mode, label) ->
+                            val isSelected = currentThemeMode.equals(mode, ignoreCase = true)
                             FilterChip(
-                                selected = currentThemeMode == mode,
+                                selected = isSelected,
                                 onClick = {
-                                    currentThemeMode = mode
-                                    prefs.setThemeMode(mode)
-                                    onThemeChanged()
+                                    if (!isSelected) {
+                                        currentThemeMode = mode
+                                        prefs.setThemeMode(mode)
+                                        onThemeChanged()
+                                    }
                                 },
-                                label = { Text(label, style = MaterialTheme.typography.labelSmall) },
-                                leadingIcon = if (currentThemeMode == mode) {
-                                    { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(14.dp)) }
-                                } else null,
+                                label = {
+                                    Text(
+                                        text = label,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                },
                                 modifier = Modifier.weight(1f)
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
                     Text(
                         text = strings.themeAccentTitle,
                         style = MaterialTheme.typography.labelMedium,
@@ -225,33 +348,44 @@ fun SettingsScreen(
                     )
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // Accent chips with color dot
-                    androidx.compose.foundation.layout.FlowRow(
+                    // Accent Colors FlowRow / Row Chips
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.fillMaxWidth()
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        com.qirke.airnotify.ui.theme.AppThemeAccent.entries.forEach { accent ->
-                            val isSelected = currentAccent == accent.id
+                        AppThemeAccent.entries.forEach { accent ->
+                            val isSelected = currentAccent.equals(accent.name, ignoreCase = true)
                             FilterChip(
                                 selected = isSelected,
                                 onClick = {
-                                    currentAccent = accent.id
-                                    prefs.setThemeAccent(accent.id)
-                                    onThemeChanged()
+                                    if (!isSelected) {
+                                        currentAccent = accent.name
+                                        prefs.setThemeAccent(accent.name)
+                                        onThemeChanged()
+                                    }
                                 },
                                 leadingIcon = {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(12.dp)
-                                            .clip(CircleShape)
-                                            .background(accent.previewColor)
-                                    )
+                                    if (accent.previewColor != null) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(14.dp)
+                                                .clip(CircleShape)
+                                                .background(accent.previewColor)
+                                        )
+                                    } else {
+                                        Icon(
+                                            Icons.Default.AutoAwesome,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                    }
                                 },
                                 label = {
                                     Text(
-                                        text = if (currentLang == "pl") accent.displayNamePl else accent.displayNameEn,
-                                        style = MaterialTheme.typography.labelSmall
+                                        text = if (currentLang.equals("pl", ignoreCase = true)) accent.displayNamePl else accent.displayNameEn,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                                     )
                                 }
                             )
@@ -261,337 +395,7 @@ fun SettingsScreen(
             }
         }
 
-        // --- IN-APP UPDATER CARD ---
-        item {
-            ElevatedCard(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(20.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.SystemUpdate, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Column {
-                                Text(
-                                    text = "In-App Updater",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    text = "Installed Version: v${BuildConfig.VERSION_NAME}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-
-                        if (!isCheckingUpdate && !isDownloadingUpdate) {
-                            FilledTonalButton(
-                                onClick = {
-                                    scope.launch {
-                                        isCheckingUpdate = true
-                                        updateMessage = null
-                                        try {
-                                            val info = InAppUpdater.checkForUpdate()
-                                            updateInfo = info
-                                            if (!info.hasUpdate) {
-                                                updateMessage = "You have the latest version installed (v${BuildConfig.VERSION_NAME})!"
-                                            }
-                                        } catch (e: Exception) {
-                                            updateMessage = "Update check: ${e.localizedMessage ?: "Network error"}"
-                                        } finally {
-                                            isCheckingUpdate = false
-                                        }
-                                    }
-                                },
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                            ) {
-                                Text("Check Now")
-                            }
-                        }
-                    }
-
-                    if (isCheckingUpdate) {
-                        Spacer(modifier = Modifier.height(14.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Text("Checking GitHub for updates...", style = MaterialTheme.typography.bodySmall)
-                        }
-                    }
-
-                    updateMessage?.let { msg ->
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                text = msg,
-                                style = MaterialTheme.typography.bodySmall,
-                                modifier = Modifier.padding(12.dp)
-                            )
-                        }
-                    }
-
-                    // Update Available Section
-                    updateInfo?.let { info ->
-                        if (info.hasUpdate) {
-                            Spacer(modifier = Modifier.height(14.dp))
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = MaterialTheme.colorScheme.primaryContainer,
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Column(modifier = Modifier.padding(14.dp)) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Default.NewReleases, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(
-                                            text = "New Update Available: v${info.versionName}!",
-                                            style = MaterialTheme.typography.titleSmall,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                                        )
-                                    }
-
-                                    Spacer(modifier = Modifier.height(6.dp))
-                                    Text(
-                                        text = info.releaseNotes,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                                    )
-
-                                    Spacer(modifier = Modifier.height(12.dp))
-
-                                    if (isDownloadingUpdate) {
-                                        Column {
-                                            LinearProgressIndicator(
-                                                progress = { downloadProgress / 100f },
-                                                modifier = Modifier.fillMaxWidth()
-                                            )
-                                            Spacer(modifier = Modifier.height(6.dp))
-                                            Text(
-                                                text = "Downloading APK: $downloadProgress%",
-                                                style = MaterialTheme.typography.labelSmall
-                                            )
-                                        }
-                                    } else if (downloadedApk != null) {
-                                        Button(
-                                            onClick = { InAppUpdater.launchInstaller(context, downloadedApk!!) },
-                                            modifier = Modifier.fillMaxWidth()
-                                        ) {
-                                            Icon(Icons.Default.InstallMobile, contentDescription = null, modifier = Modifier.size(16.dp))
-                                            Spacer(modifier = Modifier.width(6.dp))
-                                            Text("Install Downloaded Update")
-                                        }
-                                    } else {
-                                        Button(
-                                            onClick = {
-                                                scope.launch {
-                                                    isDownloadingUpdate = true
-                                                    downloadProgress = 0
-                                                    try {
-                                                        val apk = InAppUpdater.downloadAndInstall(
-                                                            context = context,
-                                                            downloadUrl = info.downloadUrl,
-                                                            versionName = info.versionName,
-                                                            onProgress = { downloadProgress = it }
-                                                        )
-                                                        downloadedApk = apk
-                                                        InAppUpdater.launchInstaller(context, apk)
-                                                    } catch (e: Exception) {
-                                                        updateMessage = "Download failed: ${e.localizedMessage}"
-                                                    } finally {
-                                                        isDownloadingUpdate = false
-                                                    }
-                                                }
-                                            },
-                                            modifier = Modifier.fillMaxWidth()
-                                        ) {
-                                            Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
-                                            Spacer(modifier = Modifier.width(6.dp))
-                                            Text("Download & Install v${info.versionName}")
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Check for updates on launch",
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                        Switch(
-                            checked = autoCheckUpdates,
-                            onCheckedChange = {
-                                autoCheckUpdates = it
-                                prefs.setAutoCheckUpdatesEnabled(it)
-                            }
-                        )
-                    }
-                }
-            }
-        }
-
-        // --- FITBIT AIR DEVICE PAIRING CARD ---
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(20.dp)
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Watch, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            text = "Fitbit Air Device",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    if (deviceConfig.address != null) {
-                        Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Text(
-                                    text = deviceConfig.name,
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    text = "MAC: ${deviceConfig.address}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            OutlinedButton(
-                                onClick = { showScanDialog = true },
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Text("Change Band")
-                            }
-
-                            TextButton(
-                                onClick = {
-                                    prefs.saveDeviceConfig(deviceConfig.copy(address = null))
-                                    deviceConfig = prefs.getDeviceConfig()
-                                },
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Text("Forget Band", color = MaterialTheme.colorScheme.error)
-                            }
-                        }
-                    } else {
-                        Text(
-                            text = "No band paired. Scan to detect your Fitbit Air band automatically.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        Button(
-                            onClick = { showScanDialog = true },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Icon(Icons.AutoMirrored.Filled.BluetoothSearching, contentDescription = null)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Scan for Fitbit Air")
-                        }
-                    }
-                }
-            }
-        }
-
-        // --- COEXISTENCE GUARD CARD ---
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(20.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                            Icon(Icons.Default.SyncLock, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Column {
-                                Text(
-                                    text = "Smart Coexistence Guard",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    text = "Prevents conflicts with Google Health & Pulse",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-
-                        Switch(
-                            checked = coexistenceGuard,
-                            onCheckedChange = {
-                                coexistenceGuard = it
-                                prefs.setCoexistenceGuardEnabled(it)
-                            }
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text(
-                        text = "When enabled, AirNotify cleanly releases Bluetooth immediately after every vibration, detects when Google Health is actively transferring sync bursts, and yields the radio with an automated settle delay to prevent connection drops (GATT Error 133).",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-        }
-
-        // --- SCREEN STATE & POCKET MODE CARD ---
+        // --- 4. SCREEN STATE & POCKET MODE CARD ---
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -641,7 +445,258 @@ fun SettingsScreen(
             }
         }
 
-        // --- SYSTEM PERMISSIONS HEALTH CHECK ---
+        // --- 5. SLEEP & QUIET HOURS (DND) CARD ---
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Default.Bedtime,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    text = strings.quietHoursTitle,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = if (quietConfig.isEnabled && quietConfig.isQuietNow()) {
+                                        String.format(strings.quietHoursActiveNow, String.format("%02d:00", quietConfig.endHour))
+                                    } else {
+                                        strings.quietHoursDesc
+                                    },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (quietConfig.isEnabled && quietConfig.isQuietNow()) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    }
+                                )
+                            }
+                        }
+
+                        Switch(
+                            checked = quietConfig.isEnabled,
+                            onCheckedChange = {
+                                quietConfig = quietConfig.copy(isEnabled = it)
+                                prefs.saveQuietHoursConfig(quietConfig)
+                            }
+                        )
+                    }
+
+                    if (quietConfig.isEnabled) {
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        Surface(
+                            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text(
+                                    text = String.format(strings.silencedBetween, String.format("%02d:00", quietConfig.startHour), String.format("%02d:00", quietConfig.endHour)),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                                Text(
+                                    text = String.format(strings.activeAtOtherTimes, String.format("%02d:00", quietConfig.endHour), String.format("%02d:00", quietConfig.startHour)),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f),
+                                    modifier = Modifier.padding(top = 2.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    String.format(strings.sleepFrom, quietConfig.startHour.toString()),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Slider(
+                                    value = quietConfig.startHour.toFloat(),
+                                    onValueChange = {
+                                        quietConfig = quietConfig.copy(startHour = it.toInt())
+                                        prefs.saveQuietHoursConfig(quietConfig)
+                                    },
+                                    valueRange = 0f..23f,
+                                    steps = 22
+                                )
+                            }
+
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    String.format(strings.wakeAt, quietConfig.endHour.toString()),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Slider(
+                                    value = quietConfig.endHour.toFloat(),
+                                    onValueChange = {
+                                        quietConfig = quietConfig.copy(endHour = it.toInt())
+                                        prefs.saveQuietHoursConfig(quietConfig)
+                                    },
+                                    valueRange = 0f..23f,
+                                    steps = 22
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+                        HorizontalDivider()
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Text(
+                            text = strings.applySleepTo,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    quietConfig = quietConfig.copy(muteNotifications = !quietConfig.muteNotifications)
+                                    prefs.saveQuietHoursConfig(quietConfig)
+                                }
+                                .padding(vertical = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(strings.muteApps, style = MaterialTheme.typography.bodyMedium)
+                            Checkbox(
+                                checked = quietConfig.muteNotifications,
+                                onCheckedChange = {
+                                    quietConfig = quietConfig.copy(muteNotifications = it)
+                                    prefs.saveQuietHoursConfig(quietConfig)
+                                }
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    quietConfig = quietConfig.copy(muteCalls = !quietConfig.muteCalls)
+                                    prefs.saveQuietHoursConfig(quietConfig)
+                                }
+                                .padding(vertical = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(strings.muteCalls, style = MaterialTheme.typography.bodyMedium)
+                            Checkbox(
+                                checked = quietConfig.muteCalls,
+                                onCheckedChange = {
+                                    quietConfig = quietConfig.copy(muteCalls = it)
+                                    prefs.saveQuietHoursConfig(quietConfig)
+                                }
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    quietConfig = quietConfig.copy(muteChimes = !quietConfig.muteChimes)
+                                    prefs.saveQuietHoursConfig(quietConfig)
+                                }
+                                .padding(vertical = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(strings.muteChimes, style = MaterialTheme.typography.bodyMedium)
+                            Checkbox(
+                                checked = quietConfig.muteChimes,
+                                onCheckedChange = {
+                                    quietConfig = quietConfig.copy(muteChimes = it)
+                                    prefs.saveQuietHoursConfig(quietConfig)
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // --- 6. SMART COEXISTENCE GUARD CARD ---
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                            Icon(Icons.Default.SyncLock, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    text = strings.coexistenceGuardTitle,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = strings.coexistenceGuardDesc,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        Switch(
+                            checked = coexistenceGuard,
+                            onCheckedChange = {
+                                coexistenceGuard = it
+                                prefs.setCoexistenceGuardEnabled(it)
+                            }
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = strings.coexistenceGuardDetail,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+
+        // --- 7. SYSTEM PERMISSIONS HEALTH CHECK ---
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -653,12 +708,12 @@ fun SettingsScreen(
                         .padding(20.dp)
                 ) {
                     Text(
-                        text = "System Permissions",
+                        text = strings.permissionsTitle,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "Ensure all permissions are active for reliable background alerts.",
+                        text = strings.permissionsDesc,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 2.dp, bottom = 12.dp)
@@ -667,8 +722,8 @@ fun SettingsScreen(
                     // 1. Notification Listener
                     val isListenerConnected = AirNotificationListenerService.isConnected
                     PermissionRow(
-                        title = "Notification Listener",
-                        subtitle = if (isListenerConnected) "Active & intercepting alerts" else "Tap to enable in Android settings",
+                        title = strings.notifListenerTitle,
+                        subtitle = if (isListenerConnected) strings.notifListenerActive else strings.notifListenerInactive,
                         isGranted = isListenerConnected,
                         onAction = {
                             context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).apply {
@@ -686,8 +741,8 @@ fun SettingsScreen(
                     } else true
 
                     PermissionRow(
-                        title = "Battery Optimization",
-                        subtitle = if (isBatteryIgnored) "Unrestricted in background" else "Request unrestricted battery",
+                        title = strings.batteryOptTitle,
+                        subtitle = if (isBatteryIgnored) strings.batteryOptActive else strings.batteryOptInactive,
                         isGranted = isBatteryIgnored,
                         onAction = {
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -705,8 +760,8 @@ fun SettingsScreen(
                     // 3. Contacts Permission
                     val hasContacts = ContactHelper.hasContactPermission(context)
                     PermissionRow(
-                        title = "Contacts Access",
-                        subtitle = if (hasContacts) "Granted (for favorite person filtering)" else "Required for contact matching",
+                        title = strings.contactsAccessTitle,
+                        subtitle = if (hasContacts) strings.contactsAccessActive else strings.contactsAccessInactive,
                         isGranted = hasContacts,
                         onAction = {
                             val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
@@ -720,7 +775,192 @@ fun SettingsScreen(
             }
         }
 
-        // --- ABOUT CARD ---
+        // --- 8. IN-APP UPDATER CARD ---
+        item {
+            ElevatedCard(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.SystemUpdate, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    text = strings.updaterTitle,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "${strings.installedVersion}: v${BuildConfig.VERSION_NAME}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        if (!isCheckingUpdate && !isDownloadingUpdate) {
+                            FilledTonalButton(
+                                onClick = {
+                                    scope.launch {
+                                        isCheckingUpdate = true
+                                        updateMessage = null
+                                        try {
+                                            val info = InAppUpdater.checkForUpdate()
+                                            isCheckingUpdate = false
+                                            if (info.hasUpdate) {
+                                                updateInfo = info
+                                            } else {
+                                                updateMessage = strings.latestVersionRunning
+                                            }
+                                        } catch (e: Exception) {
+                                            isCheckingUpdate = false
+                                            updateMessage = "Error: ${e.message}"
+                                        }
+                                    }
+                                },
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                            ) {
+                                Text(strings.checkForUpdates)
+                            }
+                        }
+                    }
+
+                    if (isCheckingUpdate) {
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(strings.checking, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+
+                    updateMessage?.let { msg ->
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = msg,
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.padding(12.dp)
+                            )
+                        }
+                    }
+
+                    updateInfo?.let { info ->
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Surface(
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                Text(
+                                    text = String.format(strings.updateAvailable, info.versionName),
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                                if (info.releaseNotes.isNotBlank()) {
+                                    Text(
+                                        text = info.releaseNotes,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
+                                        modifier = Modifier.padding(vertical = 6.dp)
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                if (isDownloadingUpdate) {
+                                    Column {
+                                        LinearProgressIndicator(
+                                            progress = { downloadProgress / 100f },
+                                            modifier = Modifier.fillMaxWidth()
+                                        )
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = "$downloadProgress%",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                                        )
+                                    }
+                                } else if (downloadedApk != null) {
+                                    Button(
+                                        onClick = { InAppUpdater.launchInstaller(context, downloadedApk!!) },
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text(strings.installDownloaded)
+                                    }
+                                } else {
+                                    Button(
+                                        onClick = {
+                                            scope.launch {
+                                                isDownloadingUpdate = true
+                                                downloadProgress = 0
+                                                try {
+                                                    val file = InAppUpdater.downloadAndInstall(
+                                                        context = context,
+                                                        downloadUrl = info.downloadUrl,
+                                                        versionName = info.versionName,
+                                                        onProgress = { downloadProgress = it }
+                                                    )
+                                                    isDownloadingUpdate = false
+                                                    downloadedApk = file
+                                                    InAppUpdater.launchInstaller(context, file)
+                                                } catch (e: Exception) {
+                                                    isDownloadingUpdate = false
+                                                    updateMessage = "Download failed: ${e.message}"
+                                                }
+                                            }
+                                        },
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text(String.format(strings.downloadAndInstall, info.versionName))
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+                    HorizontalDivider()
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = strings.autoCheckOnLaunch,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Switch(
+                            checked = autoCheckUpdates,
+                            onCheckedChange = {
+                                autoCheckUpdates = it
+                                prefs.setAutoCheckUpdatesEnabled(it)
+                            }
+                        )
+                    }
+                }
+            }
+        }
+
+        // --- 9. ABOUT CARD ---
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -805,149 +1045,6 @@ fun PermissionRow(
                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
             ) {
                 Text("Enable", style = MaterialTheme.typography.labelSmall)
-            }
-        }
-    }
-}
-
-@Composable
-fun BleScanDialog(
-    onDismiss: () -> Unit,
-    onDeviceSelected: (DiscoveredDevice) -> Unit
-) {
-    val context = LocalContext.current
-    val scanner = remember { BleScanner(context) }
-    val discoveredList = remember { mutableStateListOf<DiscoveredDevice>() }
-    var scanError by remember { mutableStateOf<String?>(null) }
-    var isScanning by remember { mutableStateOf(true) }
-
-    DisposableEffect(Unit) {
-        scanner.startScan(
-            onDeviceFound = { dev ->
-                val idx = discoveredList.indexOfFirst { it.address.equals(dev.address, ignoreCase = true) }
-                if (idx >= 0) {
-                    discoveredList[idx] = dev
-                } else {
-                    if (dev.isFitbit) {
-                        discoveredList.add(0, dev) // Put Fitbit bands at the top
-                    } else {
-                        discoveredList.add(dev)
-                    }
-                }
-            },
-            onError = { error ->
-                scanError = error
-                isScanning = false
-            }
-        )
-
-        onDispose {
-            scanner.stopScan()
-        }
-    }
-
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(
-            shape = RoundedCornerShape(24.dp),
-            color = MaterialTheme.colorScheme.surface,
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(max = 500.dp)
-                .padding(vertical = 16.dp)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(20.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Scan Nearby Bands",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                    if (isScanning) {
-                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "Make sure your Fitbit Air is awake and nearby.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                scanError?.let { err ->
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(text = err, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                if (discoveredList.isEmpty()) {
-                    Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        Text("Searching for Bluetooth devices...", style = MaterialTheme.typography.bodySmall)
-                    }
-                } else {
-                    LazyColumn(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(discoveredList) { dev ->
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = if (dev.isFitbit) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { onDeviceSelected(dev) }
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(12.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Text(
-                                                text = dev.name,
-                                                style = MaterialTheme.typography.titleSmall,
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                            if (dev.isFitbit) {
-                                                Spacer(modifier = Modifier.width(6.dp))
-                                                Badge(containerColor = MaterialTheme.colorScheme.primary) {
-                                                    Text("Fitbit", color = MaterialTheme.colorScheme.onPrimary)
-                                                }
-                                            }
-                                        }
-                                        Text(
-                                            text = dev.address,
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-
-                                    Button(
-                                        onClick = { onDeviceSelected(dev) },
-                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
-                                    ) {
-                                        Text("Pair")
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    TextButton(onClick = onDismiss) { Text("Cancel") }
-                }
             }
         }
     }

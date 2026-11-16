@@ -20,22 +20,21 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.qirke.airnotify.ble.AirHapticPattern
-import com.qirke.airnotify.ble.BleCoexistenceManager
 import com.qirke.airnotify.data.PreferencesManager
 import com.qirke.airnotify.model.DeviceConfig
 import com.qirke.airnotify.model.LogEntry
 import com.qirke.airnotify.service.AirBridgeService
 import com.qirke.airnotify.service.AirNotificationTrigger
+import com.qirke.airnotify.ui.components.BleScanDialog
 import com.qirke.airnotify.ui.i18n.LocalStrings
 import com.qirke.airnotify.ui.theme.StatusGreen
 import com.qirke.airnotify.ui.theme.StatusRed
 import java.text.SimpleDateFormat
 import java.util.*
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(
-    onNavigateToSettings: () -> Unit
+    onNavigateToSettings: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val strings = LocalStrings.current
@@ -43,21 +42,33 @@ fun DashboardScreen(
 
     var deviceConfig by remember { mutableStateOf(prefs.getDeviceConfig()) }
     var logs by remember { mutableStateOf(prefs.getLogs()) }
-    var isSyncPaused by remember { mutableStateOf(prefs.isSyncPaused()) }
-    var quietConfig by remember { mutableStateOf(prefs.getQuietHoursConfig()) }
-    var onlyScreenOff by remember { mutableStateOf(prefs.isOnlyWhenScreenOffEnabled()) }
-    val installedHealthApps = remember { BleCoexistenceManager.findInstalledHealthApps(context) }
+    var showScanDialog by remember { mutableStateOf(false) }
 
     val isVibrating by AirBridgeService.isVibratingFlow.collectAsState()
     val liveStatus by AirBridgeService.currentStatusFlow.collectAsState()
 
-    // Refresh logs periodically or when status changes
+    // Refresh state when liveStatus changes
     LaunchedEffect(liveStatus) {
         logs = prefs.getLogs()
         deviceConfig = prefs.getDeviceConfig()
-        isSyncPaused = prefs.isSyncPaused()
-        quietConfig = prefs.getQuietHoursConfig()
-        onlyScreenOff = prefs.isOnlyWhenScreenOffEnabled()
+    }
+
+    if (showScanDialog) {
+        BleScanDialog(
+            onDismiss = { showScanDialog = false },
+            onDeviceSelected = { dev ->
+                prefs.saveDeviceConfig(
+                    DeviceConfig(
+                        name = dev.name,
+                        address = dev.address,
+                        masterEnabled = true
+                    )
+                )
+                deviceConfig = prefs.getDeviceConfig()
+                AirBridgeService.checkConnection(context)
+                showScanDialog = false
+            }
+        )
     }
 
     LazyColumn(
@@ -67,7 +78,7 @@ fun DashboardScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp),
         contentPadding = PaddingValues(top = 16.dp, bottom = 80.dp)
     ) {
-        // Band Connection Card
+        // --- 1. FITBIT AIR CONNECTION & PAIRING CARD ---
         item {
             ElevatedCard(
                 modifier = Modifier.fillMaxWidth(),
@@ -83,7 +94,10 @@ fun DashboardScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
                             Box(
                                 modifier = Modifier
                                     .size(14.dp)
@@ -96,18 +110,20 @@ fun DashboardScreen(
                             )
                             Spacer(modifier = Modifier.width(10.dp))
                             Text(
-                                text = if (deviceConfig.address != null) deviceConfig.name else "No Band Paired",
+                                text = if (deviceConfig.address != null) deviceConfig.name else strings.noBandPaired,
                                 style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.Bold
                             )
                         }
 
                         if (deviceConfig.address == null) {
-                            FilledTonalButton(
-                                onClick = onNavigateToSettings,
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                            Button(
+                                onClick = { showScanDialog = true },
+                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
                             ) {
-                                Text("Pair Now")
+                                Icon(Icons.Default.BluetoothSearching, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(strings.pairNow)
                             }
                         }
                     }
@@ -115,9 +131,9 @@ fun DashboardScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = if (deviceConfig.address != null) {
-                            "Address: ${deviceConfig.address}"
+                            "${strings.address}: ${deviceConfig.address}"
                         } else {
-                            "Pair your Fitbit Air to start vibrating on notifications"
+                            strings.pairPrompt
                         },
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -154,16 +170,37 @@ fun DashboardScreen(
                         Spacer(modifier = Modifier.height(14.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.End
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             OutlinedButton(
                                 onClick = { AirBridgeService.checkConnection(context) },
-                                modifier = Modifier.height(36.dp),
-                                contentPadding = PaddingValues(horizontal = 12.dp)
+                                modifier = Modifier.weight(1f).height(38.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp)
                             ) {
                                 Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("Check Link", style = MaterialTheme.typography.labelMedium)
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(strings.checkLink, style = MaterialTheme.typography.labelSmall)
+                            }
+
+                            FilledTonalButton(
+                                onClick = { showScanDialog = true },
+                                modifier = Modifier.weight(1f).height(38.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp)
+                            ) {
+                                Icon(Icons.Default.BluetoothSearching, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(strings.changeBand, style = MaterialTheme.typography.labelSmall)
+                            }
+
+                            TextButton(
+                                onClick = {
+                                    prefs.saveDeviceConfig(DeviceConfig(name = "No Band Paired", address = null))
+                                    deviceConfig = prefs.getDeviceConfig()
+                                },
+                                modifier = Modifier.height(38.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp)
+                            ) {
+                                Text(strings.forgetBand, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
                             }
                         }
                     }
@@ -171,7 +208,7 @@ fun DashboardScreen(
             }
         }
 
-        // Master Enable Switch
+        // --- 2. MASTER ENABLE SWITCH (AIRNOTIFY SERVICE ON/OFF) ---
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -186,16 +223,18 @@ fun DashboardScreen(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "Band Alerts",
+                            text = strings.bandAlertsTitle,
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold
                         )
                         Text(
-                            text = if (deviceConfig.masterEnabled) "Wrist vibrations enabled" else "All vibrations paused",
+                            text = if (deviceConfig.masterEnabled) strings.bandAlertsEnabled else strings.bandAlertsDisabled,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
+
+                    Spacer(modifier = Modifier.width(12.dp))
 
                     Switch(
                         checked = deviceConfig.masterEnabled,
@@ -208,353 +247,7 @@ fun DashboardScreen(
             }
         }
 
-        // Inactive Window / Sleep Hours (DND) Card
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
-                )
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(20.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                Icons.Default.Bedtime,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Column {
-                                Text(
-                                    text = "Sleep & Quiet Hours (DND)",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    text = if (quietConfig.isEnabled && quietConfig.isQuietNow()) {
-                                        "Currently active (silenced until ${String.format("%02d:00", quietConfig.endHour)})"
-                                    } else {
-                                        "Mutes vibrations while you sleep"
-                                    },
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = if (quietConfig.isEnabled && quietConfig.isQuietNow()) {
-                                        MaterialTheme.colorScheme.primary
-                                    } else {
-                                        MaterialTheme.colorScheme.onSurfaceVariant
-                                    }
-                                )
-                            }
-                        }
-
-                        Switch(
-                            checked = quietConfig.isEnabled,
-                            onCheckedChange = {
-                                quietConfig = quietConfig.copy(isEnabled = it)
-                                prefs.saveQuietHoursConfig(quietConfig)
-                            }
-                        )
-                    }
-
-                    if (quietConfig.isEnabled) {
-                        Spacer(modifier = Modifier.height(14.dp))
-
-                        Surface(
-                            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Text(
-                                    text = String.format(strings.silencedBetween, String.format("%02d:00", quietConfig.startHour), String.format("%02d:00", quietConfig.endHour)),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                                )
-                                Text(
-                                    text = String.format(strings.activeAtOtherTimes, String.format("%02d:00", quietConfig.endHour), String.format("%02d:00", quietConfig.startHour)),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f),
-                                    modifier = Modifier.padding(top = 2.dp)
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(14.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    "Sleep from: ${quietConfig.startHour}:00",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Medium
-                                )
-                                Slider(
-                                    value = quietConfig.startHour.toFloat(),
-                                    onValueChange = {
-                                        quietConfig = quietConfig.copy(startHour = it.toInt())
-                                        prefs.saveQuietHoursConfig(quietConfig)
-                                    },
-                                    valueRange = 0f..23f,
-                                    steps = 22
-                                )
-                            }
-
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    "Wake at: ${quietConfig.endHour}:00",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Medium
-                                )
-                                Slider(
-                                    value = quietConfig.endHour.toFloat(),
-                                    onValueChange = {
-                                        quietConfig = quietConfig.copy(endHour = it.toInt())
-                                        prefs.saveQuietHoursConfig(quietConfig)
-                                    },
-                                    valueRange = 0f..23f,
-                                    steps = 22
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(8.dp))
-                        HorizontalDivider()
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        Text(
-                            text = "Apply sleep silence to:",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    quietConfig = quietConfig.copy(muteNotifications = !quietConfig.muteNotifications)
-                                    prefs.saveQuietHoursConfig(quietConfig)
-                                }
-                                .padding(vertical = 4.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("Mute App Notifications", style = MaterialTheme.typography.bodyMedium)
-                            Checkbox(
-                                checked = quietConfig.muteNotifications,
-                                onCheckedChange = {
-                                    quietConfig = quietConfig.copy(muteNotifications = it)
-                                    prefs.saveQuietHoursConfig(quietConfig)
-                                }
-                            )
-                        }
-
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    quietConfig = quietConfig.copy(muteCalls = !quietConfig.muteCalls)
-                                    prefs.saveQuietHoursConfig(quietConfig)
-                                }
-                                .padding(vertical = 4.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("Mute Phone Calls", style = MaterialTheme.typography.bodyMedium)
-                            Checkbox(
-                                checked = quietConfig.muteCalls,
-                                onCheckedChange = {
-                                    quietConfig = quietConfig.copy(muteCalls = it)
-                                    prefs.saveQuietHoursConfig(quietConfig)
-                                }
-                            )
-                        }
-
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    quietConfig = quietConfig.copy(muteChimes = !quietConfig.muteChimes)
-                                    prefs.saveQuietHoursConfig(quietConfig)
-                                }
-                                .padding(vertical = 4.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("Mute Hourly Chimes", style = MaterialTheme.typography.bodyMedium)
-                            Checkbox(
-                                checked = quietConfig.muteChimes,
-                                onCheckedChange = {
-                                    quietConfig = quietConfig.copy(muteChimes = it)
-                                    prefs.saveQuietHoursConfig(quietConfig)
-                                }
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        // Screen State & Pocket Mode Card (Clean single card)
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = strings.screenOffOnlyTitle,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Text(
-                            text = if (onlyScreenOff) strings.screenOffOnlyDesc else strings.screenOffOnlySubtitle,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.width(12.dp))
-
-                    Switch(
-                        checked = onlyScreenOff,
-                        onCheckedChange = {
-                            onlyScreenOff = it
-                            prefs.setOnlyWhenScreenOffEnabled(it)
-                        }
-                    )
-                }
-            }
-        }
-
-        // Google Health / Pulse Coexistence Card
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = if (isSyncPaused) {
-                        MaterialTheme.colorScheme.tertiaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.surfaceVariant
-                    }
-                )
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = if (isSyncPaused) Icons.Default.PauseCircle else Icons.Default.Sync,
-                                contentDescription = null,
-                                tint = if (isSyncPaused) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = if (isSyncPaused) "Google Health Sync Pause Active" else "Google Health Coexistence",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-
-                        if (isSyncPaused) {
-                            FilledTonalButton(
-                                onClick = {
-                                    prefs.clearSyncPause()
-                                    isSyncPaused = false
-                                },
-                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
-                            ) {
-                                Text("Resume Now", style = MaterialTheme.typography.labelSmall)
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(6.dp))
-
-                    Text(
-                        text = if (isSyncPaused) {
-                            val remainMin = (prefs.getSyncPauseRemainingMillis() / 60_000L) + 1
-                            "Alerts are paused for ~${remainMin} min so Google Health can sync without Bluetooth conflicts."
-                        } else {
-                            "AirNotify connects on-demand and immediately frees Bluetooth for Google Health. If sync ever gets stuck, pause alerts for 5 min."
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        if (!isSyncPaused) {
-                            OutlinedButton(
-                                onClick = {
-                                    prefs.pauseForSync(5)
-                                    isSyncPaused = true
-                                },
-                                modifier = Modifier.weight(1f),
-                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
-                            ) {
-                                Icon(Icons.Default.Pause, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Pause for Sync (5m)", style = MaterialTheme.typography.labelSmall)
-                            }
-                        }
-
-                        if (installedHealthApps.isNotEmpty()) {
-                            val (pkg, name) = installedHealthApps.first()
-                            FilledTonalButton(
-                                onClick = {
-                                    prefs.pauseForSync(5)
-                                    isSyncPaused = true
-                                    BleCoexistenceManager.launchHealthApp(context, pkg)
-                                },
-                                modifier = Modifier.weight(1f),
-                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
-                            ) {
-                                Icon(Icons.Default.OpenInNew, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Open $name", style = MaterialTheme.typography.labelSmall, maxLines = 1)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Quick Vibration Test Card
+        // --- 3. QUICK VIBRATION TEST CARD ---
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -603,7 +296,7 @@ fun DashboardScreen(
                             modifier = Modifier.weight(1f),
                             contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp)
                         ) {
-                            Text("Single", style = MaterialTheme.typography.labelSmall)
+                            Text(strings.patternSingle, style = MaterialTheme.typography.labelSmall)
                         }
 
                         Button(
@@ -620,7 +313,7 @@ fun DashboardScreen(
                             modifier = Modifier.weight(1f),
                             contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp)
                         ) {
-                            Text("Double", style = MaterialTheme.typography.labelSmall)
+                            Text(strings.patternDouble, style = MaterialTheme.typography.labelSmall)
                         }
 
                         Button(
@@ -637,7 +330,7 @@ fun DashboardScreen(
                             modifier = Modifier.weight(1f),
                             contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp)
                         ) {
-                            Text("Triple", style = MaterialTheme.typography.labelSmall)
+                            Text(strings.patternTriple, style = MaterialTheme.typography.labelSmall)
                         }
 
                         FilledTonalButton(
@@ -654,14 +347,14 @@ fun DashboardScreen(
                             modifier = Modifier.weight(1f),
                             contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp)
                         ) {
-                            Text("Burst", style = MaterialTheme.typography.labelSmall)
+                            Text(strings.patternUrgent, style = MaterialTheme.typography.labelSmall)
                         }
                     }
                 }
             }
         }
 
-        // Live Activity Log
+        // --- 4. LIVE ACTIVITY LOG ---
         item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -669,7 +362,7 @@ fun DashboardScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Activity Log",
+                    text = strings.recentEvents,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
                 )
@@ -679,7 +372,7 @@ fun DashboardScreen(
                         prefs.clearLogs()
                         logs = emptyList()
                     }) {
-                        Text("Clear")
+                        Text(strings.clearLogs)
                     }
                 }
             }
@@ -699,7 +392,7 @@ fun DashboardScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "No alerts yet. Notifications and vibrations will appear here.",
+                            text = strings.noEvents,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

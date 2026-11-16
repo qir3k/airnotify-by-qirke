@@ -2,6 +2,7 @@ package com.qirke.airnotify.ble
 
 import android.Manifest
 import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothClass
 import android.bluetooth.BluetoothManager
 import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanResult
@@ -65,7 +66,8 @@ class BleScanner(private val context: Context) {
         // First add already paired / bonded devices
         adapter?.bondedDevices?.forEach { dev ->
             val devName = dev.name ?: "Unknown Device"
-            val isFitbit = isFitbitName(devName)
+            val devClass = try { dev.bluetoothClass } catch (_: SecurityException) { null }
+            val isFitbit = isFitbitDevice(devName, devClass)
             onDeviceFound(
                 DiscoveredDevice(
                     name = devName,
@@ -82,7 +84,8 @@ class BleScanner(private val context: Context) {
                 val dev = result.device ?: return
                 val addr = dev.address ?: return
                 val devName = result.scanRecord?.deviceName ?: dev.name ?: "Unknown Device"
-                val isFitbit = isFitbitName(devName)
+                val devClass = try { dev.bluetoothClass } catch (_: SecurityException) { null }
+                val isFitbit = isFitbitDevice(devName, devClass)
                 val isBonded = dev.bondState == android.bluetooth.BluetoothDevice.BOND_BONDED
 
                 onDeviceFound(
@@ -133,9 +136,32 @@ class BleScanner(private val context: Context) {
         scanCallback = null
     }
 
-    private fun isFitbitName(name: String?): Boolean {
+    private fun isFitbitDevice(name: String?, bluetoothClass: BluetoothClass?): Boolean {
         if (name.isNullOrBlank()) return false
-        val lower = name.lowercase()
-        return lower.contains("fitbit") || lower.contains("air")
+        val lower = name.lowercase().trim()
+
+        // 1. Audio devices (headphones, earbuds, speakers) are never Fitbit bands
+        if (bluetoothClass != null) {
+            val major = bluetoothClass.majorDeviceClass
+            if (major == BluetoothClass.Device.Major.AUDIO_VIDEO) {
+                return false
+            }
+            if (major == BluetoothClass.Device.Major.COMPUTER || major == BluetoothClass.Device.Major.PHONE) {
+                return false
+            }
+        }
+
+        // 2. Reject common non-wearable keywords even if device class isn't reported
+        val nonFitbitKeywords = listOf(
+            "earfun", "earbud", "headphone", "headset", "airpod", "buds",
+            "laptop", "desktop", "soundbar", "speaker", "tv", "tempotec", "dongle"
+        )
+        if (nonFitbitKeywords.any { lower.contains(it) }) {
+            return false
+        }
+
+        // 3. Genuine Fitbit identification: must explicitly contain "fitbit"
+        // Matches "Google Fitbit Air", "Fitbit Air", "Fitbit Charge 6", "Fitbit Sense 2", etc.
+        return lower.contains("fitbit")
     }
 }
