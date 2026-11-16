@@ -77,6 +77,11 @@ class AirNotificationListenerService : NotificationListenerService() {
         val sender = personName ?: title ?: subText ?: ""
         val content = text ?: bigText ?: ""
 
+        // Remember sender name for easy 1-tap VIP adding in app rules
+        if (sender.isNotBlank()) {
+            prefs.addRecentSender(sbn.packageName, sender)
+        }
+
         // Check favorite persons / exclude filter
         val passed = rule.shouldAlert(sender, content)
         if (!passed) {

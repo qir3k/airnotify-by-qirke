@@ -52,16 +52,28 @@ class AirNotifyUnitTest {
     }
 
     @Test
-    fun testAppRuleDisabled() {
+    fun testAppRuleSubstringAndEmojiAndDiacriticMatching() {
         val rule = AppRule(
-            packageName = "com.whatsapp",
-            appName = "WhatsApp",
-            isEnabled = false,
-            pattern = AirHapticPattern.SINGLE,
-            filterMode = FilterMode.ALL_NOTIFICATIONS
+            packageName = "com.facebook.orca",
+            appName = "Messenger",
+            isEnabled = true,
+            pattern = AirHapticPattern.DOUBLE,
+            filterMode = FilterMode.FAVORITES_ONLY,
+            favoritePersons = listOf("Mis")
         )
 
-        assertFalse("Disabled rule should never alert", rule.shouldAlert("Anyone"))
+        // User specific question cases
+        assertTrue("'Mis' should match 'Misica'", rule.shouldAlert("Misica"))
+        assertTrue("'Mis' should match 'Misica ❤️' with emojis", rule.shouldAlert("Misica ❤️"))
+        assertTrue("'Mis' should match '❤️ Misica ❤️' surrounded by symbols", rule.shouldAlert("❤️ Misica ❤️"))
+        assertTrue("'Mis' should match Polish diacritic 'Miś'", rule.shouldAlert("Miś"))
+        assertTrue("'Mis' should match 'Miśka ✨'", rule.shouldAlert("Miśka ✨"))
+        assertTrue("'Mis' should match in chat message 'Misica: Cześć!'", rule.shouldAlert("Messenger", "Misica: Cześć!"))
+
+        // Unrelated persons should NOT match
+        assertFalse("'Mis' should not match 'Tomasz'", rule.shouldAlert("Tomasz"))
+        assertFalse("'Mis' should not match 'Anna'", rule.shouldAlert("Anna"))
+        assertFalse("'Mis' should not match 'Mama'", rule.shouldAlert("Mama"))
     }
 
     @Test

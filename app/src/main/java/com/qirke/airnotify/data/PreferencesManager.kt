@@ -236,4 +236,26 @@ class PreferencesManager(context: Context) {
     fun clearLogs() {
         prefs.edit().remove(KEY_LOGS).apply()
     }
+
+    private val KEY_RECENT_SENDERS_PREFIX = "recent_senders_"
+
+    fun getRecentSenders(packageName: String): List<String> {
+        val json = prefs.getString("$KEY_RECENT_SENDERS_PREFIX$packageName", null) ?: return emptyList()
+        return try {
+            val type = object : TypeToken<List<String>>() {}.type
+            gson.fromJson<List<String>>(json, type) ?: emptyList()
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
+    fun addRecentSender(packageName: String, senderName: String) {
+        val trimmed = senderName.trim()
+        if (trimmed.isBlank() || trimmed.length < 2) return
+        val current = getRecentSenders(packageName).toMutableList()
+        current.removeAll { it.equals(trimmed, ignoreCase = true) }
+        current.add(0, trimmed)
+        val capped = if (current.size > 20) current.take(20) else current
+        prefs.edit().putString("$KEY_RECENT_SENDERS_PREFIX$packageName", gson.toJson(capped)).apply()
+    }
 }

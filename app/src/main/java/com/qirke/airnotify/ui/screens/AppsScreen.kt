@@ -255,6 +255,7 @@ fun EditAppRuleDialog(
     onSave: (AppRule) -> Unit
 ) {
     val context = LocalContext.current
+    val prefs = remember { PreferencesManager.getInstance(context) }
     var isEnabled by remember { mutableStateOf(rule.isEnabled) }
     var pattern by remember { mutableStateOf(rule.pattern) }
     var filterMode by remember { mutableStateOf(rule.filterMode) }
@@ -386,7 +387,7 @@ fun EditAppRuleDialog(
                             }
 
                             Text(
-                                text = "e.g. girlfriend, Anna, Mom (case-insensitive name match)",
+                                text = "e.g. 'Mis' matches 'Misica', 'Miś', or '❤️ Misica ❤️' (matches words, emotes & substrings)",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(bottom = 8.dp)
@@ -411,6 +412,37 @@ fun EditAppRuleDialog(
                                             )
                                         }
                                     )
+                                }
+                            }
+
+                            // Recent Senders suggestion chips (captured from notifications)
+                            val recentSenders = remember { prefs.getRecentSenders(rule.packageName) }
+                            val unaddedRecent = recentSenders.filterNot { favoritePersons.contains(it) }
+                            if (unaddedRecent.isNotEmpty()) {
+                                Text(
+                                    text = "Recent Senders (tap to add):",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                FlowRow(
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                                    modifier = Modifier.padding(top = 4.dp, bottom = 8.dp)
+                                ) {
+                                    unaddedRecent.take(8).forEach { sender ->
+                                        SuggestionChip(
+                                            onClick = { favoritePersons.add(sender) },
+                                            label = { Text(sender) },
+                                            icon = {
+                                                Icon(
+                                                    Icons.Default.Add,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(12.dp)
+                                                )
+                                            }
+                                        )
+                                    }
                                 }
                             }
 

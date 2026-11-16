@@ -1,6 +1,7 @@
 package com.qirke.airnotify.model
 
 import com.qirke.airnotify.ble.AirHapticPattern
+import java.text.Normalizer
 
 data class AppRule(
     val packageName: String,
@@ -42,12 +43,34 @@ data class AppRule(
             if (favClean.isEmpty()) return@any false
 
             targets.any { target ->
-                if (caseSensitive) {
-                    target.contains(favClean) || favClean.contains(target)
-                } else {
-                    target.contains(favClean, ignoreCase = true) || favClean.contains(target, ignoreCase = true)
-                }
+                matchesSingle(target, favClean)
             }
+        }
+    }
+
+    private fun matchesSingle(target: String, pattern: String): Boolean {
+        if (caseSensitive) {
+            if (target.contains(pattern) || pattern.contains(target)) return true
+        } else {
+            // Direct case-insensitive substring (handles emojis, custom symbols, etc.)
+            if (target.contains(pattern, ignoreCase = true) || pattern.contains(target, ignoreCase = true)) return true
+
+            // Diacritic-forgiving match (e.g. "Mis" matches "Miś", "Miśka ❤️", "Misica")
+            val normTarget = normalize(target)
+            val normPattern = normalize(pattern)
+            if (normTarget.contains(normPattern) || normPattern.contains(normTarget)) return true
+        }
+        return false
+    }
+
+    companion object {
+        /**
+         * Normalizes text by decomposing diacritical marks (e.g. 'ś' -> 's', 'ą' -> 'a')
+         * and converting to lower case for forgiving matching.
+         */
+        fun normalize(text: String): String {
+            val decomposed = Normalizer.normalize(text, Normalizer.Form.NFD)
+            return decomposed.replace("\\p{M}".toRegex(), "").lowercase().trim()
         }
     }
 }
