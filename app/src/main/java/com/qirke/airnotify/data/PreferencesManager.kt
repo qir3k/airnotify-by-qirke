@@ -85,22 +85,11 @@ class PreferencesManager(context: Context) {
     )
 
     fun getAppRules(): List<AppRule> {
-        if (!prefs.getBoolean(KEY_DEFAULT_RULES_DISABLED_V1, false)) {
-            prefs.edit().putBoolean(KEY_DEFAULT_RULES_DISABLED_V1, true).apply()
-            val existing = prefs.getString(KEY_APP_RULES, null)
-            if (existing != null) {
-                try {
-                    val type = object : TypeToken<List<AppRule>>() {}.type
-                    val list = gson.fromJson<List<AppRule>>(existing, type)
-                    if (list != null) {
-                        val updated = list.map { it.copy(isEnabled = false) }
-                        saveAppRules(updated)
-                        return updated
-                    }
-                } catch (_: Exception) {}
-            }
+        val json = prefs.getString(KEY_APP_RULES, null)
+        if (json == null) {
+            saveAppRules(defaultRules)
+            return defaultRules
         }
-        val json = prefs.getString(KEY_APP_RULES, null) ?: return defaultRules
         return try {
             val type = object : TypeToken<List<AppRule>>() {}.type
             gson.fromJson<List<AppRule>>(json, type) ?: defaultRules
@@ -111,7 +100,7 @@ class PreferencesManager(context: Context) {
 
     fun saveAppRules(rules: List<AppRule>) {
         val json = gson.toJson(rules)
-        prefs.edit().putString(KEY_APP_RULES, json).apply()
+        prefs.edit().putString(KEY_APP_RULES, json).commit()
     }
 
     fun findAppRule(packageName: String): AppRule? {

@@ -24,6 +24,7 @@ import com.qirke.airnotify.model.AppRule
 import com.qirke.airnotify.model.FilterMode
 import com.qirke.airnotify.service.AirBridgeService
 import com.qirke.airnotify.service.AirNotificationTrigger
+import com.qirke.airnotify.ui.i18n.LocalStrings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -31,6 +32,7 @@ import kotlinx.coroutines.withContext
 @Composable
 fun AppsScreen() {
     val context = LocalContext.current
+    val strings = LocalStrings.current
     val prefs = remember { PreferencesManager.getInstance(context) }
 
     var appRules by remember { mutableStateOf(prefs.getAppRules()) }
@@ -41,12 +43,26 @@ fun AppsScreen() {
         appRules = prefs.getAppRules()
     }
 
+    fun toggleRule(packageName: String, enabled: Boolean) {
+        val updated = appRules.map {
+            if (it.packageName.equals(packageName, ignoreCase = true)) it.copy(isEnabled = enabled) else it
+        }
+        appRules = updated
+        prefs.saveAppRules(updated)
+    }
+
+    fun deleteRule(packageName: String) {
+        val updated = appRules.filterNot { it.packageName.equals(packageName, ignoreCase = true) }
+        appRules = updated
+        prefs.saveAppRules(updated)
+    }
+
     Scaffold(
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = { showAddAppDialog = true },
                 icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                text = { Text("Add App") }
+                text = { Text(strings.addApp) }
             )
         }
     ) { padding ->
@@ -60,12 +76,12 @@ fun AppsScreen() {
         ) {
             item {
                 Text(
-                    text = "Monitored Apps & Filters",
+                    text = strings.appsTitle,
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "Choose which apps vibrate your band, with custom patterns and favorite person filtering.",
+                    text = strings.appsSubtitle,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 4.dp, bottom = 8.dp)
@@ -93,19 +109,12 @@ fun AppsScreen() {
                     }
                 }
             } else {
-                items(appRules) { rule ->
+                items(appRules, key = { it.packageName }) { rule ->
                     AppRuleCard(
                         rule = rule,
-                        onToggle = { enabled ->
-                            val updated = rule.copy(isEnabled = enabled)
-                            prefs.saveOrUpdateAppRule(updated)
-                            refreshRules()
-                        },
-                        onClick = { selectedAppForEdit = rule },
-                        onDelete = {
-                            prefs.removeAppRule(rule.packageName)
-                            refreshRules()
-                        }
+                        onToggle = { enabled -> toggleRule(rule.packageName, enabled) },
+                        onConfigure = { selectedAppForEdit = rule },
+                        onDelete = { deleteRule(rule.packageName) }
                     )
                 }
             }
@@ -118,8 +127,11 @@ fun AppsScreen() {
             rule = rule,
             onDismiss = { selectedAppForEdit = null },
             onSave = { updatedRule ->
-                prefs.saveOrUpdateAppRule(updatedRule)
-                refreshRules()
+                val updated = appRules.map {
+                    if (it.packageName.equals(updatedRule.packageName, ignoreCase = true)) updatedRule else it
+                }
+                appRules = updated
+                prefs.saveAppRules(updated)
                 selectedAppForEdit = null
             }
         )
@@ -134,13 +146,14 @@ fun AppsScreen() {
                 val newRule = AppRule(
                     packageName = pkgName,
                     appName = appName,
-                    isEnabled = false,
+                    isEnabled = true,
                     pattern = AirHapticPattern.DOUBLE,
                     filterMode = FilterMode.ALL_NOTIFICATIONS,
                     favoritePersons = emptyList()
                 )
-                prefs.saveOrUpdateAppRule(newRule)
-                refreshRules()
+                val updated = appRules + newRule
+                appRules = updated
+                prefs.saveAppRules(updated)
                 showAddAppDialog = false
                 selectedAppForEdit = newRule
             }
@@ -152,16 +165,18 @@ fun AppsScreen() {
 fun AppRuleCard(
     rule: AppRule,
     onToggle: (Boolean) -> Unit,
-    onClick: () -> Unit,
+    onConfigure: () -> Unit,
     onDelete: () -> Unit
 ) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() },
+        modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (rule.isEnabled) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            containerColor = if (rule.isEnabled) {
+                MaterialTheme.colorScheme.surfaceVariant
+            } else {
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            }
         )
     ) {
         Column(
@@ -174,7 +189,11 @@ fun AppRuleCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(modifier = Modifier.weight(1f)) {
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { onConfigure() }
+                ) {
                     Text(
                         text = rule.appName,
                         style = MaterialTheme.typography.titleMedium,
@@ -186,6 +205,8 @@ fun AppRuleCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+
+                Spacer(modifier = Modifier.width(12.dp))
 
                 Switch(
                     checked = rule.isEnabled,
@@ -201,13 +222,13 @@ fun AppRuleCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 SuggestionChip(
-                    onClick = { onClick() },
+                    onClick = onConfigure,
                     label = { Text(rule.pattern.displayName, style = MaterialTheme.typography.labelSmall) },
                     icon = { Icon(Icons.Default.Vibration, contentDescription = null, modifier = Modifier.size(14.dp)) }
                 )
 
                 SuggestionChip(
-                    onClick = { onClick() },
+                    onClick = onConfigure,
                     label = {
                         val filterText = when (rule.filterMode) {
                             FilterMode.ALL_NOTIFICATIONS -> "All Senders"
@@ -288,6 +309,42 @@ fun EditAppRuleDialog(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
+
+                // Enable / Disable App Switch
+                item {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (isEnabled) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = if (isEnabled) "Alerts Active" else "Alerts Disabled",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isEnabled) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = if (isEnabled) "Band will vibrate when this app sends notifications" else "App is muted; band will not vibrate",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (isEnabled) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Switch(
+                                checked = isEnabled,
+                                onCheckedChange = { isEnabled = it }
+                            )
+                        }
+                    }
                 }
 
                 // Vibration Pattern Picker
