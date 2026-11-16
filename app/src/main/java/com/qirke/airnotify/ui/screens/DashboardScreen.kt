@@ -27,11 +27,13 @@ import com.qirke.airnotify.service.AirBridgeService
 import com.qirke.airnotify.service.AirNotificationTrigger
 import com.qirke.airnotify.ui.components.BleScanDialog
 import com.qirke.airnotify.ui.i18n.LocalStrings
+import com.qirke.airnotify.ui.i18n.localizedName
 import com.qirke.airnotify.ui.theme.StatusGreen
 import com.qirke.airnotify.ui.theme.StatusRed
 import java.text.SimpleDateFormat
 import java.util.*
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun DashboardScreen(
     onNavigateToSettings: () -> Unit = {}
@@ -278,76 +280,33 @@ fun DashboardScreen(
                         modifier = Modifier.padding(top = 4.dp, bottom = 12.dp)
                     )
 
-                    Row(
+                    FlowRow(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Button(
-                            onClick = {
-                                AirBridgeService.enqueue(
-                                    context,
-                                    AirNotificationTrigger(
-                                        source = "Test Single",
-                                        pattern = AirHapticPattern.SINGLE,
-                                        isManual = true
+                        listOf(
+                            AirHapticPattern.SINGLE,
+                            AirHapticPattern.HEARTBEAT,
+                            AirHapticPattern.SYNCOPATED,
+                            AirHapticPattern.URGENT,
+                            AirHapticPattern.SPACED
+                        ).forEach { pat ->
+                            FilledTonalButton(
+                                onClick = {
+                                    AirBridgeService.enqueue(
+                                        context,
+                                        AirNotificationTrigger(
+                                            source = "Test ${pat.displayName}",
+                                            pattern = pat,
+                                            isManual = true
+                                        )
                                     )
-                                )
-                            },
-                            modifier = Modifier.weight(1f),
-                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp)
-                        ) {
-                            Text(strings.patternSingle, style = MaterialTheme.typography.labelSmall)
-                        }
-
-                        Button(
-                            onClick = {
-                                AirBridgeService.enqueue(
-                                    context,
-                                    AirNotificationTrigger(
-                                        source = "Test Double",
-                                        pattern = AirHapticPattern.DOUBLE,
-                                        isManual = true
-                                    )
-                                )
-                            },
-                            modifier = Modifier.weight(1f),
-                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp)
-                        ) {
-                            Text(strings.patternDouble, style = MaterialTheme.typography.labelSmall)
-                        }
-
-                        Button(
-                            onClick = {
-                                AirBridgeService.enqueue(
-                                    context,
-                                    AirNotificationTrigger(
-                                        source = "Test Triple",
-                                        pattern = AirHapticPattern.TRIPLE,
-                                        isManual = true
-                                    )
-                                )
-                            },
-                            modifier = Modifier.weight(1f),
-                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp)
-                        ) {
-                            Text(strings.patternTriple, style = MaterialTheme.typography.labelSmall)
-                        }
-
-                        FilledTonalButton(
-                            onClick = {
-                                AirBridgeService.enqueue(
-                                    context,
-                                    AirNotificationTrigger(
-                                        source = "Test Urgent",
-                                        pattern = AirHapticPattern.URGENT,
-                                        isManual = true
-                                    )
-                                )
-                            },
-                            modifier = Modifier.weight(1f),
-                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp)
-                        ) {
-                            Text(strings.patternUrgent, style = MaterialTheme.typography.labelSmall)
+                                },
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                            ) {
+                                Text(pat.localizedName(strings), style = MaterialTheme.typography.labelMedium)
+                            }
                         }
                     }
                 }

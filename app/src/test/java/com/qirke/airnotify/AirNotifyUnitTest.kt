@@ -162,6 +162,9 @@ class AirNotifyUnitTest {
     @Test
     fun testHapticPatternLookup() {
         assertEquals(AirHapticPattern.SINGLE, AirHapticPattern.fromWireName("single"))
+        assertEquals(AirHapticPattern.HEARTBEAT, AirHapticPattern.fromWireName("heartbeat"))
+        assertEquals(AirHapticPattern.SYNCOPATED, AirHapticPattern.fromWireName("syncopated"))
+        assertEquals(AirHapticPattern.SPACED, AirHapticPattern.fromWireName("spaced"))
         assertEquals(AirHapticPattern.DOUBLE, AirHapticPattern.fromWireName("double"))
         assertEquals(AirHapticPattern.TRIPLE, AirHapticPattern.fromWireName("triple"))
         assertEquals(AirHapticPattern.URGENT, AirHapticPattern.fromWireName("urgent"))

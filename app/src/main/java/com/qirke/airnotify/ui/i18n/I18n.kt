@@ -145,9 +145,12 @@ class Strings(
 
     // Haptic Pattern Names
     val patternSingle: String,
+    val patternHeartbeat: String,
+    val patternSyncopated: String,
+    val patternUrgent: String,
+    val patternSpaced: String,
     val patternDouble: String,
     val patternTriple: String,
-    val patternUrgent: String,
     val patternGentle: String
 )
 
@@ -277,9 +280,12 @@ val PolishStrings = Strings(
     contactsAccessInactive = "Wymagane do rozpoznawania kontaktów",
 
     patternSingle = "Pojedynczy",
+    patternHeartbeat = "Bicie serca",
+    patternSyncopated = "Rytmiczny (Ta-Daa)",
+    patternUrgent = "Seria alarmowa",
+    patternSpaced = "Spokojny (Echo)",
     patternDouble = "Podwójny",
     patternTriple = "Potrójny",
-    patternUrgent = "Pilny",
     patternGentle = "Delikatny"
 )
 
@@ -409,10 +415,25 @@ val EnglishStrings = Strings(
     contactsAccessInactive = "Required for contact matching",
 
     patternSingle = "Single",
+    patternHeartbeat = "Heartbeat",
+    patternSyncopated = "Syncopated",
+    patternUrgent = "Urgent Burst",
+    patternSpaced = "Spaced Echo",
     patternDouble = "Double",
     patternTriple = "Triple",
-    patternUrgent = "Urgent",
     patternGentle = "Gentle"
 )
 
 val LocalStrings = compositionLocalOf { PolishStrings }
+
+fun com.qirke.airnotify.ble.AirHapticPattern.localizedName(strings: Strings): String = when (this) {
+    com.qirke.airnotify.ble.AirHapticPattern.SINGLE -> strings.patternSingle
+    com.qirke.airnotify.ble.AirHapticPattern.HEARTBEAT -> strings.patternHeartbeat
+    com.qirke.airnotify.ble.AirHapticPattern.SYNCOPATED -> strings.patternSyncopated
+    com.qirke.airnotify.ble.AirHapticPattern.URGENT -> strings.patternUrgent
+    com.qirke.airnotify.ble.AirHapticPattern.SPACED -> strings.patternSpaced
+    com.qirke.airnotify.ble.AirHapticPattern.DOUBLE -> strings.patternDouble
+    com.qirke.airnotify.ble.AirHapticPattern.TRIPLE -> strings.patternTriple
+    com.qirke.airnotify.ble.AirHapticPattern.GENTLE -> strings.patternGentle
+    com.qirke.airnotify.ble.AirHapticPattern.CONTINUOUS -> "Continuous"
+}

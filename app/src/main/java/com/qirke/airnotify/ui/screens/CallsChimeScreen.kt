@@ -21,6 +21,7 @@ import com.qirke.airnotify.model.FilterMode
 import com.qirke.airnotify.service.AirBridgeService
 import com.qirke.airnotify.service.AirNotificationTrigger
 import com.qirke.airnotify.ui.i18n.LocalStrings
+import com.qirke.airnotify.ui.i18n.localizedName
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -156,10 +157,15 @@ fun CallsChimeScreen() {
                             fontWeight = FontWeight.SemiBold
                         )
                         Spacer(modifier = Modifier.height(6.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
                             listOf(
                                 AirHapticPattern.GENTLE,
                                 AirHapticPattern.SINGLE,
+                                AirHapticPattern.HEARTBEAT,
+                                AirHapticPattern.SPACED,
                                 AirHapticPattern.DOUBLE
                             ).forEach { pat ->
                                 FilterChip(
@@ -168,7 +174,7 @@ fun CallsChimeScreen() {
                                         chimeConfig = chimeConfig.copy(pattern = pat)
                                         saveChime()
                                     },
-                                    label = { Text(pat.displayName) },
+                                    label = { Text(pat.localizedName(strings)) },
                                     leadingIcon = if (chimeConfig.pattern == pat) {
                                         { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(14.dp)) }
                                     } else null

@@ -25,6 +25,7 @@ import com.qirke.airnotify.model.FilterMode
 import com.qirke.airnotify.service.AirBridgeService
 import com.qirke.airnotify.service.AirNotificationTrigger
 import com.qirke.airnotify.ui.i18n.LocalStrings
+import com.qirke.airnotify.ui.i18n.localizedName
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -168,6 +169,7 @@ fun AppRuleCard(
     onConfigure: () -> Unit,
     onDelete: () -> Unit
 ) {
+    val strings = LocalStrings.current
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -223,7 +225,7 @@ fun AppRuleCard(
             ) {
                 SuggestionChip(
                     onClick = onConfigure,
-                    label = { Text(rule.pattern.displayName, style = MaterialTheme.typography.labelSmall) },
+                    label = { Text(rule.pattern.localizedName(strings), style = MaterialTheme.typography.labelSmall) },
                     icon = { Icon(Icons.Default.Vibration, contentDescription = null, modifier = Modifier.size(14.dp)) }
                 )
 
@@ -276,6 +278,7 @@ fun EditAppRuleDialog(
     onSave: (AppRule) -> Unit
 ) {
     val context = LocalContext.current
+    val strings = LocalStrings.current
     val prefs = remember { PreferencesManager.getInstance(context) }
     var isEnabled by remember { mutableStateOf(rule.isEnabled) }
     var pattern by remember { mutableStateOf(rule.pattern) }
@@ -361,14 +364,17 @@ fun EditAppRuleDialog(
                     ) {
                         listOf(
                             AirHapticPattern.SINGLE,
+                            AirHapticPattern.HEARTBEAT,
+                            AirHapticPattern.SYNCOPATED,
+                            AirHapticPattern.URGENT,
+                            AirHapticPattern.SPACED,
                             AirHapticPattern.DOUBLE,
-                            AirHapticPattern.TRIPLE,
-                            AirHapticPattern.URGENT
+                            AirHapticPattern.TRIPLE
                         ).forEach { pat ->
                             FilterChip(
                                 selected = pattern == pat,
                                 onClick = { pattern = pat },
-                                label = { Text(pat.displayName) },
+                                label = { Text(pat.localizedName(strings)) },
                                 leadingIcon = if (pattern == pat) {
                                     { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(14.dp)) }
                                 } else null
