@@ -55,6 +55,7 @@ fun SettingsScreen() {
     var updateMessage by remember { mutableStateOf<String?>(null) }
     var downloadedApk by remember { mutableStateOf<File?>(null) }
     var autoCheckUpdates by remember { mutableStateOf(prefs.isAutoCheckUpdatesEnabled()) }
+    var coexistenceGuard by remember { mutableStateOf(prefs.isCoexistenceGuardEnabled()) }
 
     LazyColumn(
         modifier = Modifier
@@ -351,6 +352,58 @@ fun SettingsScreen() {
                             Text("Scan for Fitbit Air")
                         }
                     }
+                }
+            }
+        }
+
+        // --- COEXISTENCE GUARD CARD ---
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                            Icon(Icons.Default.SyncLock, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    text = "Smart Coexistence Guard",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "Prevents conflicts with Google Health & Pulse",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        Switch(
+                            checked = coexistenceGuard,
+                            onCheckedChange = {
+                                coexistenceGuard = it
+                                prefs.setCoexistenceGuardEnabled(it)
+                            }
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = "When enabled, AirNotify cleanly releases Bluetooth immediately after every vibration, detects when Google Health is actively transferring sync bursts, and yields the radio with an automated settle delay to prevent connection drops (GATT Error 133).",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }

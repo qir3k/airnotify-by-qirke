@@ -19,6 +19,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.qirke.airnotify.ble.AirHapticPattern
+import com.qirke.airnotify.ble.BleCoexistenceManager
 import com.qirke.airnotify.data.PreferencesManager
 import com.qirke.airnotify.model.DeviceConfig
 import com.qirke.airnotify.model.LogEntry
@@ -39,6 +40,8 @@ fun DashboardScreen(
 
     var deviceConfig by remember { mutableStateOf(prefs.getDeviceConfig()) }
     var logs by remember { mutableStateOf(prefs.getLogs()) }
+    var isSyncPaused by remember { mutableStateOf(prefs.isSyncPaused()) }
+    val installedHealthApps = remember { BleCoexistenceManager.findInstalledHealthApps(context) }
 
     val isVibrating by AirBridgeService.isVibratingFlow.collectAsState()
     val liveStatus by AirBridgeService.currentStatusFlow.collectAsState()
@@ -47,6 +50,7 @@ fun DashboardScreen(
     LaunchedEffect(liveStatus) {
         logs = prefs.getLogs()
         deviceConfig = prefs.getDeviceConfig()
+        isSyncPaused = prefs.isSyncPaused()
     }
 
     LazyColumn(
@@ -193,6 +197,111 @@ fun DashboardScreen(
                             deviceConfig = prefs.getDeviceConfig()
                         }
                     )
+                }
+            }
+        }
+
+        // Google Health / Pulse Coexistence Card
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (isSyncPaused) {
+                        MaterialTheme.colorScheme.tertiaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.surfaceVariant
+                    }
+                )
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = if (isSyncPaused) Icons.Default.PauseCircle else Icons.Default.Sync,
+                                contentDescription = null,
+                                tint = if (isSyncPaused) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = if (isSyncPaused) "Health Sync Pause Active" else "Health Apps Coexistence",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        if (isSyncPaused) {
+                            FilledTonalButton(
+                                onClick = {
+                                    prefs.clearSyncPause()
+                                    isSyncPaused = false
+                                },
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                            ) {
+                                Text("Resume Now", style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Text(
+                        text = if (isSyncPaused) {
+                            val remainMin = (prefs.getSyncPauseRemainingMillis() / 60_000L) + 1
+                            "Alerts are paused for ~${remainMin} min so Google Health or Pulse can sync without Bluetooth conflicts."
+                        } else {
+                            "AirNotify connects on-demand and immediately frees Bluetooth for Google Health & Pulse. If sync ever gets stuck, pause alerts for 5 min."
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        if (!isSyncPaused) {
+                            OutlinedButton(
+                                onClick = {
+                                    prefs.pauseForSync(5)
+                                    isSyncPaused = true
+                                },
+                                modifier = Modifier.weight(1f),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                            ) {
+                                Icon(Icons.Default.Pause, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Pause for Sync (5m)", style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
+
+                        if (installedHealthApps.isNotEmpty()) {
+                            val (pkg, name) = installedHealthApps.first()
+                            FilledTonalButton(
+                                onClick = {
+                                    prefs.pauseForSync(5)
+                                    isSyncPaused = true
+                                    BleCoexistenceManager.launchHealthApp(context, pkg)
+                                },
+                                modifier = Modifier.weight(1f),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                            ) {
+                                Icon(Icons.Default.OpenInNew, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Open $name", style = MaterialTheme.typography.labelSmall, maxLines = 1)
+                            }
+                        }
+                    }
                 }
             }
         }

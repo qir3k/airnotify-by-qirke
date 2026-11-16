@@ -1,88 +1,123 @@
 # AirNotify by qirke ⚡
 
-**Wrist alerts and smart notifications for Google Fitbit Air.**
+<p align="center">
+  <img src="app/src/main/res/drawable/ic_fitbit_air.xml" width="96" height="96" alt="AirNotify Logo" />
+</p>
 
-AirNotify is a modern Android application engineered specifically for the Google Fitbit Air band. While Google Health and the standard Fitbit app only trigger the vibration motor for morning wakeup alarms and heart-rate warnings, AirNotify unlocks the hardware vibration motor for everyday notifications, phone calls, favorite person filtering, and hourly wrist chimes.
+<p align="center">
+  <strong>Wrist alerts, caller notifications, hourly chimes, and smart filtering for Google Fitbit Air.</strong>
+</p>
+
+<p align="center">
+  <a href="https://github.com/qir3k/airnotify-by-qirke/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/qir3k/airnotify-by-qirke/ci.yml?branch=main&label=CI&style=flat-square" alt="CI status"></a>
+  <a href="https://github.com/qir3k/airnotify-by-qirke/releases"><img src="https://img.shields.io/github/v/release/qir3k/airnotify-by-qirke?style=flat-square&color=emerald" alt="Release"></a>
+  <a href="https://developer.android.com/about/versions/14"><img src="https://img.shields.io/badge/Android-8.0%2B%20(API%2026%2B)-3DDC84?style=flat-square&logo=android&logoColor=white" alt="Android Version"></a>
+  <a href="https://developer.android.com/jetpack/compose"><img src="https://img.shields.io/badge/Jetpack%20Compose-Material%203-4285F4?style=flat-square&logo=jetpackcompose&logoColor=white" alt="Compose"></a>
+  <a href="https://kotlinlang.org"><img src="https://img.shields.io/badge/Kotlin-1.9.22-7F52FF?style=flat-square&logo=kotlin&logoColor=white" alt="Kotlin"></a>
+</p>
+
+---
+
+## 📖 Overview
+
+**AirNotify** is a standalone, companion Android application built for the **Google Fitbit Air** band.
+
+By default, the official Google Health / Fitbit companion apps only trigger the band's vibration motor for wakeup alarms and emergency heart-rate warnings. AirNotify unlocks the built-in hardware vibration motor for everyday notifications, incoming phone calls, hourly wrist chimes, and custom VIP contact filtering.
 
 ---
 
 ## 🌟 Key Features
 
-### 🔔 Smart App Notifications & Favorite Person Filtering
-- **Any Installed App:** Intercept and route notifications from Facebook Messenger, WhatsApp, Telegram, Google Messages (SMS), Instagram, Discord, Gmail, and any custom installed app.
-- **Favorite Persons Only Filter:** Choose to only vibrate when an alert comes from specific people (e.g. only vibrate Messenger when your girlfriend messages, or family/important contacts).
-- **Exclude Filter Mode:** Mute specific noisy chats or persons while letting all other messages vibrate.
-- **Custom Patterns per App:** Assign Single Pulse, Double Pulse, Triple Pulse, or Urgent Burst to distinguish apps by feel.
+### 🔔 Smart App Notifications & VIP Filtering
+- **Any Installed App:** Capture notifications from WhatsApp, Facebook Messenger, Telegram, Instagram, Google Messages (SMS), Discord, Slack, Gmail, and any app on your device.
+- **Favorite Persons Only (VIP Filter):** Want Messenger notifications *only* when your girlfriend or family members message you? AirNotify filters notifications by sender name, letting through only your designated favorites and silently ignoring noisy group chats or acquaintances.
+- **Custom Haptic Patterns:** Assign distinctive patterns per app (Single Pulse, Double Pulse, Triple Pulse, Urgent Burst) so you know what app is pinging you without looking at your screen.
 
 ### 📞 Phone Calls & Favorite Callers
-- **Continuous Ringing:** Pulses the band continuously while your phone is ringing until you answer, reject, or tap the band to silence it.
-- **Caller Filter:** Vibrate for all incoming calls, or only for favorite/starred contacts (with 1-tap starred contacts import).
-- **Call Disconnect & Tap-to-Silence:** Automatically stops vibrating as soon as the call is answered or rejected.
+- **Continuous Ringing:** Pulses the band continuously while an incoming call is ringing until you answer, decline, or silence it.
+- **VIP Callers Filter:** Choose to vibrate for all incoming calls or only for starred/favorite contacts.
+- **1-Tap Contact Importer:** Quickly sync and import starred contacts from your phone's address book.
 
-### ⏰ Hourly Chime
-- **Subtle Wrist Tap at :00:** Get a gentle wrist tap at the top of every hour so you stay on schedule without looking at your watch or phone.
-- **Configurable Active Hours:** Choose the active time window (e.g., 08:00 to 22:00) so the chime only runs while you are awake.
-- **Gentle Pattern:** Uses a discrete single or double tap designed specifically for hourly reminders.
+### ⏰ Hourly Chime (Wrist Taps at :00)
+- **Gentle Top-of-the-Hour Reminder:** Subtle wrist vibration at `:00` to keep track of time throughout the day without audio chimes.
+- **Configurable Active Window:** Set custom active hours (e.g., 08:00 to 22:00) so it never interrupts your sleep.
+- **Do Not Disturb (Quiet Hours):** Global night quiet hours to mute all vibrations automatically.
 
-### 🌙 Night Quiet Hours (Do Not Disturb)
-- Set custom sleep and wake hours (e.g. 23:00 to 07:00) to automatically mute all vibrations during the night.
+### 🛡️ Smart Health App Coexistence (Google Health / Pulse)
+A common problem with third-party tools like AirBridge was Bluetooth GATT contention — simultaneous connections would cause `GATT Status 133` errors, breaking Google Health and Pulse sync. AirNotify eliminates this with a 3-layer coexistence system:
+1. **On-Demand Transient Connection:** Never locks the BLE radio. Connects for milliseconds, sends the haptic command, cleanly disconnects, and applies a `250 ms` radio settle buffer.
+2. **Smart Collision Backoff:** Detects active health sync transfer bursts and safely backs off with exponential delay (`1500 ms`) rather than spamming the radio.
+3. **1-Tap Sync Pause & Quick Launch:** Dedicated card on the Dashboard allows pausing notifications for 5 minutes during manual health data sync, or opening Google Health / Pulse with automatic pause.
 
 ### 🔄 In-App Self-Updater (SonixLink-style)
-- **Direct GitHub Releases Integration:** Checks the repository releases for newer APK builds.
-- **In-App Download & Install:** Displays release notes, downloads the APK with live progress, and launches Android's Package Installer directly within the app.
-- **Auto-check on Launch:** Optionally checks for updates when you open the app.
+- **GitHub Releases Integration:** Built-in update checker checks for newer releases from this repository.
+- **Direct Download & Installation:** Downloads the latest APK with live progress and launches Android's Package Installer directly inside the app.
 
-### 🎨 Modern Material Design 3 (Material You)
-- Built with **Jetpack Compose** and **Material 3**.
-- Supports **Dynamic Color** (adapts to your Android 12+ wallpaper color palette).
-- Clean dashboard with band connection status badge, live activity log, and instant vibration test buttons.
-
----
-
-## 🛠️ How It Works (Protocol & BLE Engine)
-
-1. **Bluetooth Low Energy (BLE) & GoldenGate:**
-   AirNotify embeds the native Fitbit GoldenGate (`libgg.so`, `libxp.so`) and BitGatt stack (`arm64-v8a`, `armeabi-v7a`, `x86_64`).
-2. **Gattlink & DTLS 1.2 Session:**
-   Communicates directly with the Fitbit Air over BLE Gattlink with a secure DTLS 1.2 handshake.
-3. **CoAP DirectSettings Protocol:**
-   Writes protobuf-encoded settings to the `/settings` endpoint (`PUT` to inspect, `POST` to toggle haptic intensity between High/Low/Restore). The hardware band responds to the setting change with a physical vibration confirmation.
-4. **Safety Checkpoint & Recovery (`PendingHapticRecovery`):**
-   Before pulsing, AirNotify checkpoints the band's current haptics intensity in persistent storage. After pulsing, it verifies restoration. If a Bluetooth disconnect occurs mid-pulse, recovery runs automatically on the next connection.
+### 🎨 Material Design 3 (Material You)
+- Built entirely with **Jetpack Compose** and **Material 3**.
+- Native **Dynamic Color** support (adapts to your system wallpaper palette on Android 12+).
+- Clean, intuitive tabbed navigation (Dashboard, Apps & Filters, Calls & Chime, Settings).
 
 ---
 
-## 📱 Permissions Required
+## 🏗️ Architecture & Protocol
 
-- **Nearby Devices / Bluetooth (`BLUETOOTH_SCAN`, `BLUETOOTH_CONNECT`):** To discover, bond, and exchange data with the Fitbit Air band.
-- **Notification Access (`BIND_NOTIFICATION_LISTENER_SERVICE`):** Required to detect incoming notifications and filter by sender name.
-- **Phone State (`READ_PHONE_STATE`, `READ_CALL_LOG`):** To detect incoming calls and continuous ringing.
-- **Contacts (`READ_CONTACTS`):** To allow selecting favorite contacts and matching incoming phone numbers/senders against your contact list.
-- **Exact Alarms (`SCHEDULE_EXACT_ALARM`):** To wake the phone precisely at `:00` for the Hourly Chime.
-- **Battery Optimization Exemption:** To prevent Android from sleeping the background listener service.
-- **Install Packages (`REQUEST_INSTALL_PACKAGES`):** For the in-app self-updater.
+AirNotify communicates with the Fitbit Air using the native GoldenGate protocol stack:
+- **Gattlink & DTLS 1.2:** Establishes an encrypted session over characteristic `abbaff00-e56a-484c-b832-8b17cf6cbfe8`.
+- **CoAP `/settings` Protobuf Protocol:** Reads and writes haptic intensity levels. Toggling between high/low/restore triggers the physical vibration motor confirmation without modifying persistent user settings.
+- **Safe Recovery Checkpoint:** Checkpoints band haptic state in SharedPreferences before pulsing. If a Bluetooth disconnect occurs mid-pulse, recovery executes automatically upon reconnection.
 
 ---
 
-## 🔨 Building from Source
+## 📥 Download & Installation
 
+1. Go to the [Releases](https://github.com/qir3k/airnotify-by-qirke/releases) tab.
+2. Download the latest `app-release.apk` (or `app-debug.apk`).
+3. Open the APK on your Android device and allow installation from unknown sources.
+4. Launch **AirNotify** and grant the required permissions:
+   - **Notification Access:** To read and filter incoming app alerts.
+   - **Nearby Devices / Bluetooth:** To communicate with the Fitbit Air band.
+   - **Phone & Contacts:** For incoming call alerts and contact name matching.
+5. In **Settings**, tap **Scan Devices**, select your paired Fitbit Air, and tap **Test Vibration** on the Dashboard!
+
+---
+
+## 🛠️ Building from Source
+
+### Prerequisites
+- Android Studio Iguana / Jellyfish or newer (or command-line tools)
+- JDK 17
+- Android SDK 34
+
+### Build Commands
 ```bash
 # Clone the repository
-git clone https://github.com/qirke/airnotify-by-qirke.git
+git clone https://github.com/qir3k/airnotify-by-qirke.git
 cd airnotify-by-qirke
+
+# Run unit tests
+./gradlew test
 
 # Build debug APK
 ./gradlew assembleDebug
 
-# Run unit tests
-./gradlew test
+# Build release APK
+./gradlew assembleRelease
 ```
 
-The compiled APK will be located at:
-`app/build/outputs/apk/debug/app-debug.apk`
+Compiled APK locations:
+- Debug: `app/build/outputs/apk/debug/app-debug.apk`
+- Release: `app/build/outputs/apk/release/app-release.apk`
 
 ---
 
-## 📄 License & Credits
-- Built with reference to [AirBridge](https://github.com/ashu-sa/AirBridge) and [fitbit-air](https://github.com/ThoreKoritzius/fitbit-air).
-- Developed by **qirke**.
+## 🚀 GitHub Actions CI/CD
+
+- **`ci.yml`:** Automatically runs tests and builds the debug APK on every commit and pull request to `main`.
+- **`release.yml`:** When a tag like `v1.0.0` is pushed (or triggered manually via **Workflow Dispatch**), it builds both Release and Debug APKs, creates a GitHub Release, and attaches the APKs for instant download.
+
+---
+
+## 📄 Credits & Acknowledgments
+- Based on research and native stacks from [AirBridge](https://github.com/ashu-sa/AirBridge) and [fitbit-air](https://github.com/ThoreKoritzius/fitbit-air).
+- Built by **qirke** / **qir3k**.

@@ -94,6 +94,11 @@ class AirBridgeService : Service() {
         fun enqueue(context: Context, trigger: AirNotificationTrigger): Boolean {
             val prefs = PreferencesManager.getInstance(context)
             if (!trigger.isManual) {
+                if (prefs.isSyncPaused()) {
+                    Timber.d("Sync pause active for companion app sync; ignoring alert from %s", trigger.source)
+                    prefs.addLog("Sync", "Alert paused for companion sync (${trigger.source})")
+                    return false
+                }
                 val devConfig = prefs.getDeviceConfig()
                 if (!devConfig.masterEnabled) {
                     Timber.d("Master alert toggle disabled; ignoring trigger from %s", trigger.source)
@@ -269,6 +274,14 @@ class AirBridgeService : Service() {
         }
 
         val prefs = PreferencesManager.getInstance(this)
+        if (prefs.isSyncPaused()) {
+            val remainMin = (prefs.getSyncPauseRemainingMillis() / 60_000L) + 1
+            updateStatus("Alerts paused for companion app sync (~${remainMin}m left)")
+            queue.clear()
+            stopSelfIfQueueEmpty()
+            return
+        }
+
         val address = prefs.getDeviceConfig().address
         if (address.isNullOrBlank()) {
             val msg = "No Fitbit Air paired! Go to Settings to pair."
@@ -322,12 +335,21 @@ class AirBridgeService : Service() {
     }
 
     private fun executeOnce(trigger: AirNotificationTrigger, address: String): Single<AirHapticExecutionResult> {
-        val getEndpoint: Single<CoapEndpoint> = activeEndpoint?.let { Single.just(it) }
-            ?: Single.fromCallable {
-                AirRuntime.ensureInitialized(this)
-                address
-            }.flatMap { resolveDeviceConnection(it) }
-                .flatMap { connection -> connectStack(connection.device.address) }
+        val backoff: Single<Long> = if (PreferencesManager.getInstance(this).isCoexistenceGuardEnabled() && BleCoexistenceManager.isRecentCollision()) {
+            updateStatus("Waiting for companion health sync to yield radio...")
+            Single.timer(BleCoexistenceManager.SYNC_COLLISION_BACKOFF_MILLIS, TimeUnit.MILLISECONDS)
+        } else {
+            Single.just(0L)
+        }
+
+        val getEndpoint: Single<CoapEndpoint> = backoff.flatMap {
+            activeEndpoint?.let { Single.just(it) }
+                ?: Single.fromCallable {
+                    AirRuntime.ensureInitialized(this)
+                    address
+                }.flatMap { resolveDeviceConnection(it) }
+                    .flatMap { connection -> connectStack(connection.device.address) }
+        }
 
         return getEndpoint.flatMap { endpoint ->
             if (trigger.isConnectionCheck) {
@@ -366,7 +388,7 @@ class AirBridgeService : Service() {
                 }
             }.timeout(if (trigger.isCall && trigger.isContinuousCall) 70L else 25L, TimeUnit.SECONDS)
         }.flatMap { result ->
-            releasePeerAndWait().andThen(Single.timer(120, TimeUnit.MILLISECONDS).map { result })
+            releasePeerAndWait().andThen(Single.timer(BleCoexistenceManager.RADIO_SETTLE_MILLIS, TimeUnit.MILLISECONDS).map { result })
         }
     }
 
@@ -541,6 +563,9 @@ class AirBridgeService : Service() {
 
     private fun formatFriendlyError(trigger: AirNotificationTrigger, throwable: Throwable): String {
         val msg = throwable.message.orEmpty()
+        if (msg.contains("133") || msg.contains("busy", true) || msg.contains("timed out", true) || msg.contains("empty", true)) {
+            BleCoexistenceManager.markCollision()
+        }
         val hint = when {
             msg.contains("Bluetooth is disabled", ignoreCase = true) ->
                 "Bluetooth is turned off on your phone."

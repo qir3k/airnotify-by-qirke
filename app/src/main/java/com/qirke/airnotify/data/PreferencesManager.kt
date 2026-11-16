@@ -21,6 +21,8 @@ class PreferencesManager(context: Context) {
         private const val KEY_DEVICE_CONFIG = "device_config"
         private const val KEY_LOGS = "event_logs"
         private const val KEY_AUTO_CHECK_UPDATES = "auto_check_updates"
+        private const val KEY_SYNC_PAUSE_UNTIL = "sync_pause_until"
+        private const val KEY_COEXISTENCE_GUARD = "coexistence_guard"
 
         @Volatile
         private var instance: PreferencesManager? = null
@@ -182,6 +184,33 @@ class PreferencesManager(context: Context) {
 
     fun setAutoCheckUpdatesEnabled(enabled: Boolean) {
         prefs.edit().putBoolean(KEY_AUTO_CHECK_UPDATES, enabled).apply()
+    }
+
+    fun isCoexistenceGuardEnabled(): Boolean =
+        prefs.getBoolean(KEY_COEXISTENCE_GUARD, true)
+
+    fun setCoexistenceGuardEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_COEXISTENCE_GUARD, enabled).apply()
+    }
+
+    fun pauseForSync(durationMinutes: Int = 5) {
+        val until = System.currentTimeMillis() + (durationMinutes * 60_000L)
+        prefs.edit().putLong(KEY_SYNC_PAUSE_UNTIL, until).apply()
+        addLog("Sync", "Alerts paused for $durationMinutes minutes for companion sync")
+    }
+
+    fun clearSyncPause() {
+        prefs.edit().remove(KEY_SYNC_PAUSE_UNTIL).apply()
+        addLog("Sync", "Sync pause cleared; alerts resumed")
+    }
+
+    fun isSyncPaused(): Boolean =
+        getSyncPauseRemainingMillis() > 0L
+
+    fun getSyncPauseRemainingMillis(): Long {
+        val until = prefs.getLong(KEY_SYNC_PAUSE_UNTIL, 0L)
+        val now = System.currentTimeMillis()
+        return if (until > now) until - now else 0L
     }
 
     fun getLogs(): List<LogEntry> {

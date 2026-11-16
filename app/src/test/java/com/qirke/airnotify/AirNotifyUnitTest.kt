@@ -123,4 +123,11 @@ class AirNotifyUnitTest {
         assertEquals(AirHapticPattern.CONTINUOUS, AirHapticPattern.fromWireName("continuous"))
         assertEquals(AirHapticPattern.SINGLE, AirHapticPattern.fromWireName("unknown"))
     }
+
+    @Test
+    fun testBleCoexistenceConstants() {
+        assertTrue(com.qirke.airnotify.ble.BleCoexistenceManager.RADIO_SETTLE_MILLIS >= 200L)
+        assertTrue(com.qirke.airnotify.ble.BleCoexistenceManager.SYNC_COLLISION_BACKOFF_MILLIS >= 1000L)
+        assertTrue(com.qirke.airnotify.ble.BleCoexistenceManager.KNOWN_HEALTH_APPS.isNotEmpty())
+    }
 }
