@@ -1,0 +1,210 @@
+package com.qirke.airnotify.data
+
+import android.content.Context
+import android.content.SharedPreferences
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+import com.qirke.airnotify.ble.AirHapticPattern
+import com.qirke.airnotify.model.*
+
+class PreferencesManager(context: Context) {
+    private val prefs: SharedPreferences =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    private val gson = Gson()
+
+    companion object {
+        private const val PREFS_NAME = "airnotify_preferences"
+        private const val KEY_APP_RULES = "app_rules"
+        private const val KEY_CALL_CONFIG = "call_config"
+        private const val KEY_HOURLY_CHIME = "hourly_chime"
+        private const val KEY_QUIET_HOURS = "quiet_hours"
+        private const val KEY_DEVICE_CONFIG = "device_config"
+        private const val KEY_LOGS = "event_logs"
+        private const val KEY_AUTO_CHECK_UPDATES = "auto_check_updates"
+
+        @Volatile
+        private var instance: PreferencesManager? = null
+
+        fun getInstance(context: Context): PreferencesManager =
+            instance ?: synchronized(this) {
+                instance ?: PreferencesManager(context.applicationContext).also { instance = it }
+            }
+    }
+
+    // Default pre-populated apps
+    private val defaultRules = listOf(
+        AppRule(
+            packageName = "com.facebook.orca",
+            appName = "Messenger",
+            isEnabled = true,
+            pattern = AirHapticPattern.DOUBLE,
+            filterMode = FilterMode.ALL_NOTIFICATIONS,
+            favoritePersons = emptyList()
+        ),
+        AppRule(
+            packageName = "com.whatsapp",
+            appName = "WhatsApp",
+            isEnabled = true,
+            pattern = AirHapticPattern.DOUBLE,
+            filterMode = FilterMode.ALL_NOTIFICATIONS,
+            favoritePersons = emptyList()
+        ),
+        AppRule(
+            packageName = "org.telegram.messenger",
+            appName = "Telegram",
+            isEnabled = true,
+            pattern = AirHapticPattern.SINGLE,
+            filterMode = FilterMode.ALL_NOTIFICATIONS,
+            favoritePersons = emptyList()
+        ),
+        AppRule(
+            packageName = "com.google.android.apps.messaging",
+            appName = "Messages (SMS)",
+            isEnabled = true,
+            pattern = AirHapticPattern.SINGLE,
+            filterMode = FilterMode.ALL_NOTIFICATIONS,
+            favoritePersons = emptyList()
+        ),
+        AppRule(
+            packageName = "com.instagram.android",
+            appName = "Instagram",
+            isEnabled = true,
+            pattern = AirHapticPattern.SINGLE,
+            filterMode = FilterMode.ALL_NOTIFICATIONS,
+            favoritePersons = emptyList()
+        )
+    )
+
+    fun getAppRules(): List<AppRule> {
+        val json = prefs.getString(KEY_APP_RULES, null) ?: return defaultRules
+        return try {
+            val type = object : TypeToken<List<AppRule>>() {}.type
+            gson.fromJson<List<AppRule>>(json, type) ?: defaultRules
+        } catch (e: Exception) {
+            defaultRules
+        }
+    }
+
+    fun saveAppRules(rules: List<AppRule>) {
+        val json = gson.toJson(rules)
+        prefs.edit().putString(KEY_APP_RULES, json).apply()
+    }
+
+    fun findAppRule(packageName: String): AppRule? {
+        return getAppRules().firstOrNull { it.packageName.equals(packageName, ignoreCase = true) }
+    }
+
+    fun saveOrUpdateAppRule(rule: AppRule) {
+        val current = getAppRules().toMutableList()
+        val index = current.indexOfFirst { it.packageName.equals(rule.packageName, ignoreCase = true) }
+        if (index >= 0) {
+            current[index] = rule
+        } else {
+            current.add(rule)
+        }
+        saveAppRules(current)
+    }
+
+    fun removeAppRule(packageName: String) {
+        val current = getAppRules().filterNot { it.packageName.equals(packageName, ignoreCase = true) }
+        saveAppRules(current)
+    }
+
+    fun getCallConfig(): CallConfig {
+        val json = prefs.getString(KEY_CALL_CONFIG, null) ?: return CallConfig()
+        return try {
+            gson.fromJson(json, CallConfig::class.java) ?: CallConfig()
+        } catch (e: Exception) {
+            CallConfig()
+        }
+    }
+
+    fun saveCallConfig(config: CallConfig) {
+        prefs.edit().putString(KEY_CALL_CONFIG, gson.toJson(config)).apply()
+    }
+
+    fun getHourlyChimeConfig(): HourlyChimeConfig {
+        val json = prefs.getString(KEY_HOURLY_CHIME, null) ?: return HourlyChimeConfig()
+        return try {
+            gson.fromJson(json, HourlyChimeConfig::class.java) ?: HourlyChimeConfig()
+        } catch (e: Exception) {
+            HourlyChimeConfig()
+        }
+    }
+
+    fun saveHourlyChimeConfig(config: HourlyChimeConfig) {
+        prefs.edit().putString(KEY_HOURLY_CHIME, gson.toJson(config)).apply()
+    }
+
+    fun getQuietHoursConfig(): QuietHoursConfig {
+        val json = prefs.getString(KEY_QUIET_HOURS, null) ?: return QuietHoursConfig()
+        return try {
+            gson.fromJson(json, QuietHoursConfig::class.java) ?: QuietHoursConfig()
+        } catch (e: Exception) {
+            QuietHoursConfig()
+        }
+    }
+
+    fun saveQuietHoursConfig(config: QuietHoursConfig) {
+        prefs.edit().putString(KEY_QUIET_HOURS, gson.toJson(config)).apply()
+    }
+
+    fun getDeviceConfig(): DeviceConfig {
+        val json = prefs.getString(KEY_DEVICE_CONFIG, null) ?: return DeviceConfig()
+        return try {
+            gson.fromJson(json, DeviceConfig::class.java) ?: DeviceConfig()
+        } catch (e: Exception) {
+            DeviceConfig()
+        }
+    }
+
+    fun saveDeviceConfig(config: DeviceConfig) {
+        prefs.edit().putString(KEY_DEVICE_CONFIG, gson.toJson(config)).apply()
+    }
+
+    fun saveDeviceAddress(address: String, name: String = "Fitbit Air") {
+        val current = getDeviceConfig()
+        saveDeviceConfig(current.copy(address = address, name = name))
+    }
+
+    fun saveLastStatus(status: String) {
+        val current = getDeviceConfig()
+        saveDeviceConfig(current.copy(lastStatus = status))
+    }
+
+    fun setMasterEnabled(enabled: Boolean) {
+        val current = getDeviceConfig()
+        saveDeviceConfig(current.copy(masterEnabled = enabled))
+    }
+
+    fun isAutoCheckUpdatesEnabled(): Boolean =
+        prefs.getBoolean(KEY_AUTO_CHECK_UPDATES, true)
+
+    fun setAutoCheckUpdatesEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_AUTO_CHECK_UPDATES, enabled).apply()
+    }
+
+    fun getLogs(): List<LogEntry> {
+        val json = prefs.getString(KEY_LOGS, null) ?: return emptyList()
+        return try {
+            val type = object : TypeToken<List<LogEntry>>() {}.type
+            gson.fromJson<List<LogEntry>>(json, type) ?: emptyList()
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    @Synchronized
+    fun addLog(tag: String, message: String, isError: Boolean = false) {
+        val logs = getLogs().toMutableList()
+        logs.add(0, LogEntry(System.currentTimeMillis(), tag, message, isError))
+        if (logs.size > 50) {
+            logs.subList(50, logs.size).clear()
+        }
+        prefs.edit().putString(KEY_LOGS, gson.toJson(logs)).apply()
+    }
+
+    fun clearLogs() {
+        prefs.edit().remove(KEY_LOGS).apply()
+    }
+}

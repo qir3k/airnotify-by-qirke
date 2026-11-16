@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">AirNotify</string>
+    <string name="notification_service_name">AirNotify Notification Listener</string>
+    <string name="notification_channel_name">AirNotify Background Service</string>
+    <string name="notification_channel_desc">Shows active status when connected or alerting Fitbit Air</string>
+    <string name="chime_channel_name">AirNotify Hourly Chime</string>
+    <string name="chime_channel_desc">Hourly chime reminders</string>
+</resources>
