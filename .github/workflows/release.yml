@@ -53,25 +53,30 @@ jobs:
       - name: Run unit tests
         run: ./gradlew test
 
-      - name: Build Release and Debug APKs
-        run: ./gradlew assembleRelease assembleDebug
+      - name: Build Release APK
+        run: ./gradlew assembleRelease
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
-      - name: Determine tag name
+      - name: Determine tag name and prepare release APK
         id: vars
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "tag=${{ github.event.inputs.tag_name }}" >> $GITHUB_OUTPUT
-            echo "title=${{ github.event.inputs.release_name }}" >> $GITHUB_OUTPUT
+            TAG="${{ github.event.inputs.tag_name }}"
+            TITLE="${{ github.event.inputs.release_name }}"
           else
-            echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
-            echo "title=AirNotify ${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+            TAG="${GITHUB_REF#refs/tags/}"
+            TITLE="AirNotify ${GITHUB_REF#refs/tags/}"
           fi
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "title=${TITLE}" >> $GITHUB_OUTPUT
+          
+          mkdir -p release-artifacts
+          cp app/build/outputs/apk/release/app-release.apk "release-artifacts/AirNotify-${TAG}.apk"
 
-      - name: Create GitHub Release & Upload APKs
+      - name: Create GitHub Release & Upload APK
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.vars.outputs.tag }}
@@ -79,8 +84,6 @@ jobs:
           draft: false
           prerelease: false
           generate_release_notes: true
-          files: |
-            app/build/outputs/apk/release/*.apk
-            app/build/outputs/apk/debug/*.apk
+          files: release-artifacts/AirNotify-*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
