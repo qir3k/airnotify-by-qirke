@@ -1,3 +1,13 @@
+# Preserve generic signatures, reflections, and annotations
+-keepattributes Signature
+-keepattributes *Annotation*
+-keepattributes EnclosingMethod
+-keepattributes InnerClasses
+
+# Keep Gson
+-keep class com.google.gson.** { *; }
+-dontwarn com.google.gson.**
+
 # Golden Gate invokes JVM callbacks from JNI. Preserve its bundled bridge and
 # transport libraries conservatively; shrink the app/Compose and unused icons.
 -keep class com.fitbit.** { *; }
@@ -7,6 +17,7 @@
 
 # Keep our models and services
 -keep class com.qirke.airnotify.** { *; }
+-keepclassmembers class com.qirke.airnotify.** { *; }
 
 # Optional remote-RPC CBOR types were absent from the original AAR bundle and
 # are not used by settings/CoAP path. Do not suppress JNI warnings.

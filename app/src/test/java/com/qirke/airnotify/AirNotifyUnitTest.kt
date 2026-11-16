@@ -185,4 +185,97 @@ class AirNotifyUnitTest {
         assertTrue("Notifications should default to screen off only", defaultOnlyWhenScreenOffNotifications)
         assertTrue("Calls should default to screen off only", defaultOnlyWhenScreenOffCalls)
     }
+
+    @Test
+    fun testHapticPatternRunnerSinglePulse() {
+        val writes = mutableListOf<Int>()
+        var currentBandIntensity = AirDirectSettingsProtocol.HAPTICS_HIGH
+        val mockClient = object : com.qirke.airnotify.ble.HapticSettingsClient {
+            override fun read(): io.reactivex.Single<Int> = io.reactivex.Single.just(currentBandIntensity)
+            override fun write(intensity: Int): io.reactivex.Single<Unit> {
+                writes.add(intensity)
+                currentBandIntensity = intensity
+                return io.reactivex.Single.just(Unit)
+            }
+        }
+
+        val testScheduler = io.reactivex.schedulers.TestScheduler()
+        var verifiedCalled = false
+        val runner = com.qirke.airnotify.ble.HapticPatternRunner(
+            client = mockClient,
+            scheduler = testScheduler,
+            verified = { verifiedCalled = true }
+        )
+
+        val testObserver = runner.execute(AirHapticPattern.SINGLE).test()
+        testScheduler.triggerActions()
+
+        testObserver.assertComplete()
+        assertEquals("Single pattern must perform exactly 1 write", 1, writes.size)
+        assertEquals(AirDirectSettingsProtocol.HAPTICS_LOW, writes[0])
+        assertTrue("Verified callback must be called", verifiedCalled)
+    }
+
+    @Test
+    fun testHapticPatternRunnerDoublePulse() {
+        val writes = mutableListOf<Int>()
+        var currentBandIntensity = AirDirectSettingsProtocol.HAPTICS_HIGH
+        val mockClient = object : com.qirke.airnotify.ble.HapticSettingsClient {
+            override fun read(): io.reactivex.Single<Int> = io.reactivex.Single.just(currentBandIntensity)
+            override fun write(intensity: Int): io.reactivex.Single<Unit> {
+                writes.add(intensity)
+                currentBandIntensity = intensity
+                return io.reactivex.Single.just(Unit)
+            }
+        }
+
+        val testScheduler = io.reactivex.schedulers.TestScheduler()
+        var verifiedCalled = false
+        val runner = com.qirke.airnotify.ble.HapticPatternRunner(
+            client = mockClient,
+            scheduler = testScheduler,
+            verified = { verifiedCalled = true }
+        )
+
+        val testObserver = runner.execute(AirHapticPattern.DOUBLE).test()
+        testScheduler.advanceTimeBy(1, java.util.concurrent.TimeUnit.SECONDS)
+
+        testObserver.assertComplete()
+        assertEquals("Double pattern must perform exactly 2 writes", 2, writes.size)
+        assertEquals(AirDirectSettingsProtocol.HAPTICS_LOW, writes[0])
+        assertEquals(AirDirectSettingsProtocol.HAPTICS_HIGH, writes[1])
+        assertTrue("Verified callback must be called", verifiedCalled)
+    }
+
+    @Test
+    fun testHapticPatternRunnerTriplePulse() {
+        val writes = mutableListOf<Int>()
+        var currentBandIntensity = AirDirectSettingsProtocol.HAPTICS_LOW
+        val mockClient = object : com.qirke.airnotify.ble.HapticSettingsClient {
+            override fun read(): io.reactivex.Single<Int> = io.reactivex.Single.just(currentBandIntensity)
+            override fun write(intensity: Int): io.reactivex.Single<Unit> {
+                writes.add(intensity)
+                currentBandIntensity = intensity
+                return io.reactivex.Single.just(Unit)
+            }
+        }
+
+        val testScheduler = io.reactivex.schedulers.TestScheduler()
+        var verifiedCalled = false
+        val runner = com.qirke.airnotify.ble.HapticPatternRunner(
+            client = mockClient,
+            scheduler = testScheduler,
+            verified = { verifiedCalled = true }
+        )
+
+        val testObserver = runner.execute(AirHapticPattern.TRIPLE).test()
+        testScheduler.advanceTimeBy(2, java.util.concurrent.TimeUnit.SECONDS)
+
+        testObserver.assertComplete()
+        assertEquals("Triple pattern must perform exactly 3 writes", 3, writes.size)
+        assertEquals(AirDirectSettingsProtocol.HAPTICS_HIGH, writes[0])
+        assertEquals(AirDirectSettingsProtocol.HAPTICS_LOW, writes[1])
+        assertEquals(AirDirectSettingsProtocol.HAPTICS_HIGH, writes[2])
+        assertTrue("Verified callback must be called", verifiedCalled)
+    }
 }

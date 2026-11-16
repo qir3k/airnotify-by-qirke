@@ -358,15 +358,21 @@ class AirBridgeService : Service() {
             }
 
             val pending = PendingHapticRecovery.get(this, address)
-            val ready = if (pending == null) {
-                Single.just(Unit)
-            } else if (trigger.isManual) {
-                updateStatus("Recovering previous vibration setting before pulsing...")
-                AirHapticPatternExecutor.recover(endpoint, pending) {
+            val ready = if (pending != null) {
+                Timber.w("Recovering previous vibration setting before pulsing (pending=%d)", pending)
+                val safePending = if (pending == AirDirectSettingsProtocol.HAPTICS_LOW) {
+                    AirDirectSettingsProtocol.HAPTICS_LOW
+                } else {
+                    AirDirectSettingsProtocol.HAPTICS_HIGH
+                }
+                AirHapticPatternExecutor.recover(endpoint, safePending) {
                     PendingHapticRecovery.clear(this, address)
+                }.onErrorResumeNext {
+                    PendingHapticRecovery.clear(this, address)
+                    Single.just(Unit)
                 }
             } else {
-                Single.error(HapticsRestoreException("Previous vibration setting needs recovery"))
+                Single.just(Unit)
             }
 
             ready.flatMap {

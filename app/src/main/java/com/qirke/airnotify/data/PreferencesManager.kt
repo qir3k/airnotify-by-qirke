@@ -6,11 +6,15 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.qirke.airnotify.ble.AirHapticPattern
 import com.qirke.airnotify.model.*
+import org.json.JSONArray
+import org.json.JSONObject
+import timber.log.Timber
 
 class PreferencesManager(context: Context) {
     private val prefs: SharedPreferences =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val gson = Gson()
+    private var cachedAppRules: List<AppRule>? = null
 
     companion object {
         private const val PREFS_NAME = "airnotify_preferences"
@@ -85,22 +89,64 @@ class PreferencesManager(context: Context) {
     )
 
     fun getAppRules(): List<AppRule> {
+        cachedAppRules?.let { return it }
+
         val json = prefs.getString(KEY_APP_RULES, null)
-        if (json == null) {
+        if (json.isNullOrBlank()) {
             saveAppRules(defaultRules)
             return defaultRules
         }
+
         return try {
-            val type = object : TypeToken<List<AppRule>>() {}.type
-            gson.fromJson<List<AppRule>>(json, type) ?: defaultRules
+            val array = JSONArray(json)
+            val list = mutableListOf<AppRule>()
+            for (i in 0 until array.length()) {
+                val obj = array.getJSONObject(i)
+                val favs = mutableListOf<String>()
+                val favArr = obj.optJSONArray("favoritePersons")
+                if (favArr != null) {
+                    for (j in 0 until favArr.length()) {
+                        favs.add(favArr.getString(j))
+                    }
+                }
+                list.add(
+                    AppRule(
+                        packageName = obj.optString("packageName", ""),
+                        appName = obj.optString("appName", "Unknown"),
+                        isEnabled = obj.optBoolean("isEnabled", false),
+                        pattern = AirHapticPattern.fromWireName(obj.optString("pattern", "double")),
+                        filterMode = runCatching { FilterMode.valueOf(obj.optString("filterMode", "ALL_NOTIFICATIONS")) }.getOrDefault(FilterMode.ALL_NOTIFICATIONS),
+                        favoritePersons = favs,
+                        caseSensitive = obj.optBoolean("caseSensitive", false)
+                    )
+                )
+            }
+            val result = if (list.isEmpty()) defaultRules else list
+            cachedAppRules = result
+            result
         } catch (e: Exception) {
+            Timber.e(e, "Failed to parse app rules JSON, falling back to default rules")
             defaultRules
         }
     }
 
     fun saveAppRules(rules: List<AppRule>) {
-        val json = gson.toJson(rules)
-        prefs.edit().putString(KEY_APP_RULES, json).commit()
+        cachedAppRules = rules
+        val array = JSONArray()
+        rules.forEach { rule ->
+            val obj = JSONObject()
+            obj.put("packageName", rule.packageName)
+            obj.put("appName", rule.appName)
+            obj.put("isEnabled", rule.isEnabled)
+            obj.put("pattern", rule.pattern.wireName)
+            obj.put("filterMode", rule.filterMode.name)
+            val favArr = JSONArray()
+            rule.favoritePersons.forEach { favArr.put(it) }
+            obj.put("favoritePersons", favArr)
+            obj.put("caseSensitive", rule.caseSensitive)
+            array.put(obj)
+        }
+        prefs.edit().putString(KEY_APP_RULES, array.toString()).commit()
     }
 
     fun findAppRule(packageName: String): AppRule? {

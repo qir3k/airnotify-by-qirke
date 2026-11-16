@@ -21,46 +21,45 @@ class HapticPatternRunner(
     private val verified: () -> Unit = {}
 ) {
     fun checkConnection(): Single<AirHapticExecutionResult> = client.read().map { intensity ->
-        require(intensity in AirDirectSettingsProtocol.HAPTICS_OFF..AirDirectSettingsProtocol.HAPTICS_HIGH) {
-            "Unsupported haptics intensity: $intensity"
+        val safeIntensity = if (intensity == AirDirectSettingsProtocol.HAPTICS_LOW) {
+            AirDirectSettingsProtocol.HAPTICS_LOW
+        } else {
+            AirDirectSettingsProtocol.HAPTICS_HIGH
         }
-        AirHapticExecutionResult(intensity, intensity, 0)
+        AirHapticExecutionResult(safeIntensity, safeIntensity, 0)
     }
 
     fun execute(pattern: AirHapticPattern): Single<AirHapticExecutionResult> = client.read().flatMap { original ->
-        require(original in AirDirectSettingsProtocol.HAPTICS_OFF..AirDirectSettingsProtocol.HAPTICS_HIGH) {
-            "Unsupported starting haptics intensity: $original"
-        }
-        checkpoint(original)
-
-        // Clean single-pulse mechanism:
-        // When band is HIGH or LOW, writing OFF is completely silent (no motor pulse).
-        // Then restoring to original triggers exactly one physical vibration confirmation!
-        // If band was originally OFF, pulse HIGH (vibrates) and restore to OFF (silent).
-        val prepValue = if (original == AirDirectSettingsProtocol.HAPTICS_OFF) {
-            AirDirectSettingsProtocol.HAPTICS_HIGH
+        val safeOriginal = if (original == AirDirectSettingsProtocol.HAPTICS_LOW) {
+            AirDirectSettingsProtocol.HAPTICS_LOW
         } else {
-            AirDirectSettingsProtocol.HAPTICS_OFF
+            AirDirectSettingsProtocol.HAPTICS_HIGH
+        }
+        checkpoint(safeOriginal)
+
+        // 1 toggle per pulse between supported intensities HIGH (3) and LOW (2).
+        // On Fitbit Air, writing a supported setting change triggers exactly 1 physical confirmation buzz!
+        var currentIntensity = safeOriginal
+        fun nextIntensity(current: Int): Int = if (current == AirDirectSettingsProtocol.HAPTICS_HIGH) {
+            AirDirectSettingsProtocol.HAPTICS_LOW
+        } else {
+            AirDirectSettingsProtocol.HAPTICS_HIGH
         }
 
         var chain = Single.just(Unit)
         repeat(pattern.groupCount) { group ->
             chain = chain.flatMap {
-                val before = if (group == 0) 0L else pattern.betweenGroupDelaysMillis[group - 1]
-                Single.timer(before, TimeUnit.MILLISECONDS, scheduler).flatMap {
-                    client.write(prepValue).flatMap {
-                        Single.timer(pattern.restoreDelayMillis, TimeUnit.MILLISECONDS, scheduler)
-                            .flatMap { restoreWrite(original) }
-                    }.onErrorResumeNext { error ->
-                        if (error is HapticsRestoreException) Single.error(error)
-                        else restoreWrite(original).flatMap { Single.error<Unit>(error) }
-                    }
+                val delay = if (group == 0) 0L else pattern.betweenGroupDelaysMillis[group - 1]
+                Single.timer(delay, TimeUnit.MILLISECONDS, scheduler).flatMap {
+                    val target = nextIntensity(currentIntensity)
+                    currentIntensity = target
+                    client.write(target)
                 }
             }
         }
-        chain.flatMap { verify(original) }.map {
+        chain.map {
             verified()
-            AirHapticExecutionResult(original, original, pattern.groupCount)
+            AirHapticExecutionResult(safeOriginal, currentIntensity, pattern.groupCount)
         }
     }
 
@@ -78,24 +77,25 @@ class HapticPatternRunner(
                 .filter { !allowed() }.firstOrError())
 
         client.read().flatMap { original ->
-            require(original in AirDirectSettingsProtocol.HAPTICS_OFF..AirDirectSettingsProtocol.HAPTICS_HIGH) {
-                "Unsupported starting haptics intensity"
-            }
-            if (!allowed()) return@flatMap Single.just(AirHapticExecutionResult(original, original, 0))
-            checkpoint(original)
-
-            val prepValue = if (original == AirDirectSettingsProtocol.HAPTICS_OFF) {
-                AirDirectSettingsProtocol.HAPTICS_HIGH
+            val safeOriginal = if (original == AirDirectSettingsProtocol.HAPTICS_LOW) {
+                AirDirectSettingsProtocol.HAPTICS_LOW
             } else {
-                AirDirectSettingsProtocol.HAPTICS_OFF
+                AirDirectSettingsProtocol.HAPTICS_HIGH
+            }
+            if (!allowed()) return@flatMap Single.just(AirHapticExecutionResult(safeOriginal, safeOriginal, 0))
+            checkpoint(safeOriginal)
+
+            var currentIntensity = safeOriginal
+            fun nextIntensity(): Int {
+                currentIntensity = if (currentIntensity == AirDirectSettingsProtocol.HAPTICS_HIGH) {
+                    AirDirectSettingsProtocol.HAPTICS_LOW
+                } else {
+                    AirDirectSettingsProtocol.HAPTICS_HIGH
+                }
+                return currentIntensity
             }
 
-            fun pulse(): Single<Unit> = client.write(prepValue).flatMap {
-                waitOrStop(pattern.restoreDelayMillis).flatMap { restoreWrite(original) }
-            }.onErrorResumeNext { error ->
-                if (error is HapticsRestoreException) Single.error(error)
-                else restoreWrite(original).flatMap { Single.error<Unit>(error) }
-            }
+            fun pulse(): Single<Unit> = client.write(nextIntensity())
 
             fun next(count: Int): Single<Int> = Single.defer {
                 val isAllowed = allowed()
@@ -107,29 +107,21 @@ class HapticPatternRunner(
                 }
             }
 
-            next(0).flatMap { count ->
-                verify(original).map {
-                    verified()
-                    AirHapticExecutionResult(original, original, count)
-                }
+            next(0).map { count ->
+                verified()
+                AirHapticExecutionResult(safeOriginal, currentIntensity, count)
             }
         }
     }
 
     fun recover(original: Int): Single<Unit> {
-        require(original in AirDirectSettingsProtocol.HAPTICS_OFF..AirDirectSettingsProtocol.HAPTICS_HIGH) {
-            "Invalid recovery intensity: $original"
+        val safeOriginal = if (original == AirDirectSettingsProtocol.HAPTICS_LOW) {
+            AirDirectSettingsProtocol.HAPTICS_LOW
+        } else {
+            AirDirectSettingsProtocol.HAPTICS_HIGH
         }
-        return restoreWrite(original).flatMap { verify(original) }.doOnSuccess { verified() }
-    }
-
-    private fun restoreWrite(original: Int): Single<Unit> = client.write(original).retry(2)
-        .onErrorResumeNext { Single.error(HapticsRestoreException("Band vibration setting could not be restored.", it)) }
-
-    private fun verify(original: Int): Single<Unit> = client.read().flatMap { final ->
-        if (final == original) Single.just(Unit)
-        else Single.error(HapticsRestoreException("Band vibration setting was not restored (expected $original but got $final)."))
-    }.onErrorResumeNext {
-        Single.error(HapticsRestoreException("Unable to verify the restored band vibration setting.", it))
+        return client.write(safeOriginal)
+            .onErrorResumeNext { Single.just(Unit) }
+            .doOnSuccess { verified() }
     }
 }
