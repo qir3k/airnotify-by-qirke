@@ -2,6 +2,7 @@ package com.qirke.airnotify.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -203,38 +204,201 @@ fun DashboardScreen(
             }
         }
 
-        // Active Sleep Window Indicator
-        if (quietConfig.isEnabled && quietConfig.isQuietNow()) {
-            item {
-                Surface(
-                    color = MaterialTheme.colorScheme.secondaryContainer,
-                    shape = RoundedCornerShape(16.dp),
-                    modifier = Modifier.fillMaxWidth()
+        // Inactive Window / Sleep Hours (DND) Card
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                )
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp)
                 ) {
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            Icons.Default.Bedtime,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(24.dp)
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column {
-                            Text(
-                                text = "Sleep / Inactive Window Active",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Default.Bedtime,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
                             )
-                            Text(
-                                text = "Alerts and chimes are currently silenced (until ${String.format("%02d:00", quietConfig.endHour)})",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    text = "Sleep & Quiet Hours (DND)",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = if (quietConfig.isEnabled && quietConfig.isQuietNow()) {
+                                        "Currently active (silenced until ${String.format("%02d:00", quietConfig.endHour)})"
+                                    } else {
+                                        "Mutes vibrations while you sleep"
+                                    },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (quietConfig.isEnabled && quietConfig.isQuietNow()) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    }
+                                )
+                            }
+                        }
+
+                        Switch(
+                            checked = quietConfig.isEnabled,
+                            onCheckedChange = {
+                                quietConfig = quietConfig.copy(isEnabled = it)
+                                prefs.saveQuietHoursConfig(quietConfig)
+                            }
+                        )
+                    }
+
+                    if (quietConfig.isEnabled) {
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        Surface(
+                            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text(
+                                    text = "🌙 Silenced between ${String.format("%02d:00", quietConfig.startHour)} and ${String.format("%02d:00", quietConfig.endHour)}",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                                Text(
+                                    text = "☀️ Active at all other times (${String.format("%02d:00", quietConfig.endHour)} - ${String.format("%02d:00", quietConfig.startHour)})",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f),
+                                    modifier = Modifier.padding(top = 2.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    "Sleep from: ${quietConfig.startHour}:00",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Slider(
+                                    value = quietConfig.startHour.toFloat(),
+                                    onValueChange = {
+                                        quietConfig = quietConfig.copy(startHour = it.toInt())
+                                        prefs.saveQuietHoursConfig(quietConfig)
+                                    },
+                                    valueRange = 0f..23f,
+                                    steps = 22
+                                )
+                            }
+
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    "Wake at: ${quietConfig.endHour}:00",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Slider(
+                                    value = quietConfig.endHour.toFloat(),
+                                    onValueChange = {
+                                        quietConfig = quietConfig.copy(endHour = it.toInt())
+                                        prefs.saveQuietHoursConfig(quietConfig)
+                                    },
+                                    valueRange = 0f..23f,
+                                    steps = 22
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+                        HorizontalDivider()
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Text(
+                            text = "Apply sleep silence to:",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    quietConfig = quietConfig.copy(muteNotifications = !quietConfig.muteNotifications)
+                                    prefs.saveQuietHoursConfig(quietConfig)
+                                }
+                                .padding(vertical = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Mute App Notifications", style = MaterialTheme.typography.bodyMedium)
+                            Checkbox(
+                                checked = quietConfig.muteNotifications,
+                                onCheckedChange = {
+                                    quietConfig = quietConfig.copy(muteNotifications = it)
+                                    prefs.saveQuietHoursConfig(quietConfig)
+                                }
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    quietConfig = quietConfig.copy(muteCalls = !quietConfig.muteCalls)
+                                    prefs.saveQuietHoursConfig(quietConfig)
+                                }
+                                .padding(vertical = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Mute Phone Calls", style = MaterialTheme.typography.bodyMedium)
+                            Checkbox(
+                                checked = quietConfig.muteCalls,
+                                onCheckedChange = {
+                                    quietConfig = quietConfig.copy(muteCalls = it)
+                                    prefs.saveQuietHoursConfig(quietConfig)
+                                }
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    quietConfig = quietConfig.copy(muteChimes = !quietConfig.muteChimes)
+                                    prefs.saveQuietHoursConfig(quietConfig)
+                                }
+                                .padding(vertical = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Mute Hourly Chimes", style = MaterialTheme.typography.bodyMedium)
+                            Checkbox(
+                                checked = quietConfig.muteChimes,
+                                onCheckedChange = {
+                                    quietConfig = quietConfig.copy(muteChimes = it)
+                                    prefs.saveQuietHoursConfig(quietConfig)
+                                }
                             )
                         }
                     }

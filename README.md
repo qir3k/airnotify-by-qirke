@@ -1,7 +1,7 @@
 # AirNotify by qirke ⚡
 
 <p align="center">
-  <img src="docs/logo.png" width="128" height="128" alt="AirNotify Logo" />
+  <img src="https://raw.githubusercontent.com/qir3k/airnotify-by-qirke/main/docs/logo.png" width="128" height="128" alt="AirNotify Logo" />
 </p>
 
 <p align="center">

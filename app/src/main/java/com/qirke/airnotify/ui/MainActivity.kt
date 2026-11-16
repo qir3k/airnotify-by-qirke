@@ -6,6 +6,7 @@ import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -30,14 +31,12 @@ import com.qirke.airnotify.ui.screens.SettingsScreen
 import com.qirke.airnotify.ui.theme.AirNotifyTheme
 import com.qirke.airnotify.ui.theme.StatusGreen
 import com.qirke.airnotify.ui.theme.StatusRed
-import com.qirke.airnotify.updater.InAppUpdater
-import kotlinx.coroutines.launch
 
-enum class Screen(val title: String, val icon: ImageVector) {
-    DASHBOARD("Dashboard", Icons.Default.Dashboard),
-    APPS("Apps", Icons.Default.Apps),
-    CALLS_CHIME("Calls & Chime", Icons.Default.RingVolume),
-    SETTINGS("Settings", Icons.Default.Settings)
+enum class Screen(val title: String, val navLabel: String, val icon: ImageVector) {
+    DASHBOARD("Dashboard", "Dashboard", Icons.Default.Dashboard),
+    APPS("Apps & Rules", "Apps", Icons.Default.Apps),
+    CALLS_CHIME("Calls & Chimes", "Calls", Icons.Default.RingVolume),
+    SETTINGS("Settings", "Settings", Icons.Default.Settings)
 }
 
 class MainActivity : ComponentActivity() {
@@ -48,28 +47,35 @@ class MainActivity : ComponentActivity() {
 
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Enable true full-screen Edge-to-Edge with transparent system bars
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
         // Request runtime permissions if missing
         requestMissingPermissions()
 
-        // Auto check for updates on startup if enabled
         val prefs = PreferencesManager.getInstance(this)
-        if (prefs.isAutoCheckUpdatesEnabled()) {
-            // Optional background check
-        }
 
         setContent {
             AirNotifyTheme {
                 var currentScreen by remember { mutableStateOf(Screen.DASHBOARD) }
                 val isVibrating by AirBridgeService.isVibratingFlow.collectAsState()
-                val deviceConfig = remember { prefs.getDeviceConfig() }
+                val liveStatus by AirBridgeService.currentStatusFlow.collectAsState()
+                var deviceConfig by remember { mutableStateOf(prefs.getDeviceConfig()) }
+
+                LaunchedEffect(liveStatus) {
+                    deviceConfig = prefs.getDeviceConfig()
+                }
 
                 Scaffold(
+                    modifier = Modifier.fillMaxSize(),
                     topBar = {
                         TopAppBar(
                             title = {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
                                     Text(
                                         text = "AirNotify",
                                         fontWeight = FontWeight.Bold,
@@ -115,14 +121,30 @@ class MainActivity : ComponentActivity() {
                                 NavigationBarItem(
                                     selected = currentScreen == screen,
                                     onClick = { currentScreen = screen },
-                                    icon = { Icon(screen.icon, contentDescription = screen.title) },
-                                    label = { Text(screen.title) }
+                                    icon = {
+                                        Icon(
+                                            imageVector = screen.icon,
+                                            contentDescription = screen.title
+                                        )
+                                    },
+                                    label = {
+                                        Text(
+                                            text = screen.navLabel,
+                                            maxLines = 1,
+                                            style = MaterialTheme.typography.labelSmall
+                                        )
+                                    },
+                                    alwaysShowLabel = true
                                 )
                             }
                         }
                     }
                 ) { padding ->
-                    Box(modifier = Modifier.padding(padding)) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(padding)
+                    ) {
                         when (currentScreen) {
                             Screen.DASHBOARD -> DashboardScreen(onNavigateToSettings = { currentScreen = Screen.SETTINGS })
                             Screen.APPS -> AppsScreen()
