@@ -38,9 +38,11 @@ import com.qirke.airnotify.ble.*
 import com.qirke.airnotify.data.PreferencesManager
 import com.qirke.airnotify.ui.MainActivity
 import io.reactivex.Completable
+import io.reactivex.Flowable
 import io.reactivex.Single
 import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.disposables.CompositeDisposable
+import io.reactivex.functions.BiFunction
 import io.reactivex.schedulers.Schedulers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -297,7 +299,7 @@ class AirBridgeService : Service() {
         updateStatus("Alerting Fitbit: ${trigger.source} [${trigger.pattern.displayName}]")
 
         disposables.add(
-            executeOnce(trigger, address)
+            executeWithRetry(trigger, address)
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(
@@ -328,10 +330,66 @@ class AirBridgeService : Service() {
                         if (AirRuntime.isInitialized()) {
                             runCatching { BitGattHelper.clearConnections(FitbitGatt.getInstance()) }
                         }
-                        processNext()
+                        mainHandler.postDelayed({ processNext() }, BleCoexistenceManager.RADIO_SETTLE_MILLIS)
                     }
                 )
         )
+    }
+
+    private fun isTransientBleError(throwable: Throwable): Boolean {
+        val msg = throwable.message.orEmpty()
+        return msg.contains("INVALID_STATE", ignoreCase = true) ||
+               msg.contains("Encrypted session", ignoreCase = true) ||
+               msg.contains("TLS", ignoreCase = true) ||
+               msg.contains("133") ||
+               msg.contains("busy", ignoreCase = true) ||
+               msg.contains("timed out", ignoreCase = true) ||
+               msg.contains("timeout", ignoreCase = true) ||
+               msg.contains("closed", ignoreCase = true) ||
+               msg.contains("disconnect", ignoreCase = true) ||
+               msg.contains("connection", ignoreCase = true) ||
+               msg.contains("GattConnectTransaction", ignoreCase = true) ||
+               throwable is java.util.concurrent.TimeoutException ||
+               throwable is IllegalStateException
+    }
+
+    private fun executeWithRetry(
+        trigger: AirNotificationTrigger,
+        address: String,
+        maxRetries: Int = 2
+    ): Single<AirHapticExecutionResult> {
+        return Single.defer { executeOnce(trigger, address) }
+            .retryWhen { errors: Flowable<Throwable> ->
+                errors.zipWith(
+                    Flowable.range(1, maxRetries + 1),
+                    BiFunction<Throwable, Int, Pair<Throwable, Int>> { error, attempt -> error to attempt }
+                ).flatMap { pair ->
+                    val error = pair.first
+                    val attempt = pair.second
+                    val isRecoverable = isTransientBleError(error)
+                    val isUserDisabled = error.message?.contains("Bluetooth is disabled", true) == true
+                    val isPermMissing = error is SecurityException
+
+                    if (attempt <= maxRetries && isRecoverable && !isUserDisabled && !isPermMissing) {
+                        BleCoexistenceManager.markCollision()
+                        val delay: Long = if (error.message?.contains("Encrypted session", true) == true ||
+                                        error.message?.contains("TLS", true) == true) {
+                            1200L * attempt.toLong()
+                        } else {
+                            450L * attempt.toLong()
+                        }
+                        Timber.w("BLE transient glitch on ${trigger.source} (attempt $attempt/$maxRetries): ${error.message}. Retrying in ${delay}ms...")
+                        updateStatus("Retrying link to Fitbit Air ($attempt/$maxRetries)...")
+                        releasePeer()
+                        if (AirRuntime.isInitialized()) {
+                            runCatching { BitGattHelper.clearConnections(FitbitGatt.getInstance()) }
+                        }
+                        Flowable.timer(delay, TimeUnit.MILLISECONDS)
+                    } else {
+                        Flowable.error(error)
+                    }
+                }
+            }
     }
 
     private fun executeOnce(trigger: AirNotificationTrigger, address: String): Single<AirHapticExecutionResult> {
@@ -569,7 +627,9 @@ class AirBridgeService : Service() {
 
     private fun formatFriendlyError(trigger: AirNotificationTrigger, throwable: Throwable): String {
         val msg = throwable.message.orEmpty()
-        if (msg.contains("133") || msg.contains("busy", true) || msg.contains("timed out", true) || msg.contains("empty", true)) {
+        if (msg.contains("133") || msg.contains("busy", true) || msg.contains("timed out", true) ||
+            msg.contains("empty", true) || msg.contains("INVALID_STATE", true) ||
+            msg.contains("Encrypted session", true) || msg.contains("TLS", true)) {
             BleCoexistenceManager.markCollision()
         }
         val hint = when {
@@ -579,6 +639,8 @@ class AirBridgeService : Service() {
                 "Fitbit Air not found nearby. Make sure it is awake, charged, and in range."
             msg.contains("Encrypted session", ignoreCase = true) ->
                 "Secure session failed. Ensure band is paired in Google Health / Fitbit app."
+            msg.contains("INVALID_STATE", ignoreCase = true) ->
+                "Bluetooth radio was busy transitioning state. Retrying will resolve this."
             msg.contains("timed out", ignoreCase = true) ->
                 "Connection timed out. Band may be busy or syncing."
             throwable is SecurityException ->

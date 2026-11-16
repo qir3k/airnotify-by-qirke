@@ -10,7 +10,7 @@ import java.util.concurrent.atomic.AtomicLong
 object BleCoexistenceManager {
 
     /** Delay in milliseconds to allow Android's Bluetooth daemon (Fluoride/BlueDroid) to cleanly flush L2CAP channels after disconnect */
-    const val RADIO_SETTLE_MILLIS = 250L
+    const val RADIO_SETTLE_MILLIS = 350L
 
     /** Extended delay when a busy/133 error occurred to allow Google Health to finish its background sync transfer */
     const val SYNC_COLLISION_BACKOFF_MILLIS = 1500L
