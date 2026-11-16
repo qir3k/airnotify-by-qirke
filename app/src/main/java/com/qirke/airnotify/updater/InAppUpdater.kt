@@ -28,7 +28,7 @@ data class UpdateInfo(
 
 object InAppUpdater {
 
-    private const val GITHUB_REPO = "qirke/airnotify-by-qirke"
+    private const val GITHUB_REPO = "qir3k/airnotify-by-qirke"
     private const val RELEASES_API = "https://api.github.com/repos/$GITHUB_REPO/releases/latest"
 
     private val httpClient = OkHttpClient.Builder()

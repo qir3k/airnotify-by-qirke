@@ -1,7 +1,7 @@
 # AirNotify by qirke ⚡
 
 <p align="center">
-  <img src="app/src/main/res/drawable/ic_fitbit_air.xml" width="96" height="96" alt="AirNotify Logo" />
+  <img src="docs/logo.png" width="128" height="128" alt="AirNotify Logo" />
 </p>
 
 <p align="center">

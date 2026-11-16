@@ -23,6 +23,18 @@ android {
         }
     }
 
+    signingConfigs {
+        create("release") {
+            val keystoreFile = rootProject.file("keystore/release.keystore")
+            if (keystoreFile.exists()) {
+                storeFile = keystoreFile
+                storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "airnotifypass"
+                keyAlias = System.getenv("KEY_ALIAS") ?: "airnotify"
+                keyPassword = System.getenv("KEY_PASSWORD") ?: "airnotifypass"
+            }
+        }
+    }
+
     buildTypes {
         debug {
             isDebuggable = true
@@ -34,7 +46,12 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("debug")
+            val releaseConfig = signingConfigs.findByName("release")
+            signingConfig = if (releaseConfig?.storeFile?.exists() == true) {
+                releaseConfig
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 
