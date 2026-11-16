@@ -40,8 +40,13 @@ By default, the official Google Health / Fitbit companion apps only trigger the 
 
 ### ⏰ Hourly Chime (Wrist Taps at :00)
 - **Gentle Top-of-the-Hour Reminder:** Subtle wrist vibration at `:00` to keep track of time throughout the day without audio chimes.
-- **Configurable Active Window:** Set custom active hours (e.g., 08:00 to 22:00) so it never interrupts your sleep.
-- **Do Not Disturb (Quiet Hours):** Global night quiet hours to mute all vibrations automatically.
+- **Hands-Off Simplicity:** No clunky active window setup. It vibrates every hour automatically, and is seamlessly silenced during your Sleep / Inactive Window.
+
+### 🌙 Unified Inactive Window / Sleep Hours (DND)
+- **Natural Sleep Scheduling:** Define when you are inactive/asleep (e.g., 23:00 to 07:00), rather than having to specify daytime active hours.
+- **Universal Silence Across All Features:** Automatically mutes App Notifications, Phone Calls, and Hourly Chimes during your sleep window, while keeping all of them active at all other times.
+- **Granular Controls:** Choose exactly what to silence (Mute Notifications, Mute Calls, Mute Chimes).
+- **Live Status on Dashboard:** Displays a sleep status banner when you are in your quiet window with wake time indication.
 
 ### 🛡️ Smart Health App Coexistence (Google Health / Pulse)
 A common problem with third-party tools like AirBridge was Bluetooth GATT contention — simultaneous connections would cause `GATT Status 133` errors, breaking Google Health and Pulse sync. AirNotify eliminates this with a 3-layer coexistence system:

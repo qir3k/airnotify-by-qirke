@@ -65,37 +65,71 @@ class AirNotifyUnitTest {
     }
 
     @Test
-    fun testHourlyChimeActiveWindow() {
-        val chime = HourlyChimeConfig(
+    fun testQuietHoursInactiveWindowOvernight() {
+        val quiet = QuietHoursConfig(
             isEnabled = true,
-            startHour = 8,
-            endHour = 22,
-            pattern = AirHapticPattern.GENTLE
+            startHour = 23,
+            startMinute = 0,
+            endHour = 7,
+            endMinute = 0,
+            muteNotifications = true,
+            muteCalls = true,
+            muteChimes = true
         )
 
-        assertTrue("Hour 8 (start) should be active", chime.isHourActive(8))
-        assertTrue("Hour 14 (afternoon) should be active", chime.isHourActive(14))
-        assertTrue("Hour 22 (end) should be active", chime.isHourActive(22))
-        assertFalse("Hour 7 (morning before start) should be inactive", chime.isHourActive(7))
-        assertFalse("Hour 23 (night after end) should be inactive", chime.isHourActive(23))
-        assertFalse("Hour 2 (midnight) should be inactive", chime.isHourActive(2))
+        // Hours inside inactive / sleep window (23:00 to 07:00)
+        assertTrue("Hour 23 (bedtime) should be quiet/inactive", quiet.isHourQuiet(23))
+        assertTrue("Hour 0 (midnight) should be quiet/inactive", quiet.isHourQuiet(0))
+        assertTrue("Hour 3 (deep sleep) should be quiet/inactive", quiet.isHourQuiet(3))
+        assertTrue("Hour 6 (early morning) should be quiet/inactive", quiet.isHourQuiet(6))
+
+        // Hours outside inactive window (awake hours: 07:00 to 23:00)
+        assertFalse("Hour 7 (wake hour) should be active (not quiet)", quiet.isHourQuiet(7))
+        assertFalse("Hour 8 should be active (not quiet)", quiet.isHourQuiet(8))
+        assertFalse("Hour 12 (noon) should be active (not quiet)", quiet.isHourQuiet(12))
+        assertFalse("Hour 18 (evening) should be active (not quiet)", quiet.isHourQuiet(18))
+        assertFalse("Hour 22 should be active (not quiet)", quiet.isHourQuiet(22))
     }
 
     @Test
-    fun testHourlyChimeOvernightWindow() {
-        val chime = HourlyChimeConfig(
+    fun testQuietHoursDaytimeWindow() {
+        val quiet = QuietHoursConfig(
             isEnabled = true,
-            startHour = 22,
-            endHour = 4,
-            pattern = AirHapticPattern.GENTLE
+            startHour = 13,
+            startMinute = 0,
+            endHour = 15,
+            endMinute = 0
         )
 
-        assertTrue("Hour 22 should be active", chime.isHourActive(22))
-        assertTrue("Hour 23 should be active", chime.isHourActive(23))
-        assertTrue("Hour 0 should be active", chime.isHourActive(0))
-        assertTrue("Hour 2 should be active", chime.isHourActive(2))
-        assertTrue("Hour 4 should be active", chime.isHourActive(4))
-        assertFalse("Hour 12 should be inactive", chime.isHourActive(12))
+        assertFalse("Hour 12 should be active", quiet.isHourQuiet(12))
+        assertTrue("Hour 13 should be quiet", quiet.isHourQuiet(13))
+        assertTrue("Hour 14 should be quiet", quiet.isHourQuiet(14))
+        assertFalse("Hour 15 should be active", quiet.isHourQuiet(15))
+        assertFalse("Hour 20 should be active", quiet.isHourQuiet(20))
+    }
+
+    @Test
+    fun testQuietHoursDisabled() {
+        val quiet = QuietHoursConfig(
+            isEnabled = false,
+            startHour = 23,
+            endHour = 7
+        )
+
+        assertFalse("Disabled quiet hours should never silence hour 23", quiet.isHourQuiet(23))
+        assertFalse("Disabled quiet hours should never silence hour 2", quiet.isHourQuiet(2))
+        assertFalse("Disabled quiet hours should never silence hour 12", quiet.isHourQuiet(12))
+    }
+
+    @Test
+    fun testQuietHoursFeatureFlags() {
+        val quiet = QuietHoursConfig()
+        assertTrue(quiet.isEnabled)
+        assertEquals(23, quiet.startHour)
+        assertEquals(7, quiet.endHour)
+        assertTrue("Notifications should be muted by default during sleep", quiet.muteNotifications)
+        assertTrue("Calls should be muted by default during sleep", quiet.muteCalls)
+        assertTrue("Chimes should be muted by default during sleep", quiet.muteChimes)
     }
 
     @Test

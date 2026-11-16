@@ -41,6 +41,7 @@ fun DashboardScreen(
     var deviceConfig by remember { mutableStateOf(prefs.getDeviceConfig()) }
     var logs by remember { mutableStateOf(prefs.getLogs()) }
     var isSyncPaused by remember { mutableStateOf(prefs.isSyncPaused()) }
+    var quietConfig by remember { mutableStateOf(prefs.getQuietHoursConfig()) }
     val installedHealthApps = remember { BleCoexistenceManager.findInstalledHealthApps(context) }
 
     val isVibrating by AirBridgeService.isVibratingFlow.collectAsState()
@@ -51,6 +52,7 @@ fun DashboardScreen(
         logs = prefs.getLogs()
         deviceConfig = prefs.getDeviceConfig()
         isSyncPaused = prefs.isSyncPaused()
+        quietConfig = prefs.getQuietHoursConfig()
     }
 
     LazyColumn(
@@ -197,6 +199,45 @@ fun DashboardScreen(
                             deviceConfig = prefs.getDeviceConfig()
                         }
                     )
+                }
+            }
+        }
+
+        // Active Sleep Window Indicator
+        if (quietConfig.isEnabled && quietConfig.isQuietNow()) {
+            item {
+                Surface(
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.Bedtime,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = "Sleep / Inactive Window Active",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                            Text(
+                                text = "Alerts and chimes are currently silenced (until ${String.format("%02d:00", quietConfig.endHour)})",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
+                            )
+                        }
+                    }
                 }
             }
         }

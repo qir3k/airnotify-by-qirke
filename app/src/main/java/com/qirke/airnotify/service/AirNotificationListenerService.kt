@@ -50,7 +50,13 @@ class AirNotificationListenerService : NotificationListenerService() {
         val prefs = PreferencesManager.getInstance(this)
         val devConfig = prefs.getDeviceConfig()
         if (!devConfig.masterEnabled) return
-        if (prefs.getQuietHoursConfig().isQuietNow()) return
+
+        val quietConfig = prefs.getQuietHoursConfig()
+        if (quietConfig.isEnabled && quietConfig.muteNotifications && quietConfig.isQuietNow()) {
+            Timber.d("Notification muted: inside inactive/sleep window (%02d:00-%02d:00)",
+                quietConfig.startHour, quietConfig.endHour)
+            return
+        }
 
         val rule = prefs.findAppRule(sbn.packageName) ?: return
         if (!rule.isEnabled) return

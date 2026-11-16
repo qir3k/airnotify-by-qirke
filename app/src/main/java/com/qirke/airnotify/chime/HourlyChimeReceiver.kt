@@ -21,14 +21,11 @@ class HourlyChimeReceiver : BroadcastReceiver() {
         val chimeConfig = prefs.getHourlyChimeConfig()
         if (!chimeConfig.isEnabled) return
 
-        if (!chimeConfig.isNowActive()) {
-            Timber.d("Hourly chime skipped: outside active hours (%02d:00-%02d:00)",
-                chimeConfig.startHour, chimeConfig.endHour)
-            return
-        }
-
-        if (prefs.getQuietHoursConfig().isQuietNow()) {
-            Timber.d("Hourly chime skipped: quiet hours active")
+        // Check global inactive / sleep window
+        val quietConfig = prefs.getQuietHoursConfig()
+        if (quietConfig.isEnabled && quietConfig.muteChimes && quietConfig.isQuietNow()) {
+            Timber.d("Hourly chime skipped: inside inactive/sleep window (%02d:00-%02d:00)",
+                quietConfig.startHour, quietConfig.endHour)
             return
         }
 

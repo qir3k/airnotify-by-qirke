@@ -23,6 +23,14 @@ class PhoneCallReceiver : BroadcastReceiver() {
 
         when (state) {
             TelephonyManager.EXTRA_STATE_RINGING -> {
+                val quietConfig = prefs.getQuietHoursConfig()
+                if (quietConfig.isEnabled && quietConfig.muteCalls && quietConfig.isQuietNow()) {
+                    Timber.d("Incoming call vibration muted: inside inactive/sleep window (%02d:00-%02d:00)",
+                        quietConfig.startHour, quietConfig.endHour)
+                    prefs.addLog("Call", "Silenced incoming call (Inactive / Sleep Window)")
+                    return
+                }
+
                 val incomingNumber = intent.getStringExtra(TelephonyManager.EXTRA_INCOMING_NUMBER)
                 val contactName = ContactHelper.resolveContactName(context, incomingNumber)
                 val callerIdentity = contactName ?: incomingNumber ?: "Incoming Call"
