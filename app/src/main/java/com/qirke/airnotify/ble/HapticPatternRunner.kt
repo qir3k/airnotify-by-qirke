@@ -32,10 +32,15 @@ class HapticPatternRunner(
             "Unsupported starting haptics intensity: $original"
         }
         checkpoint(original)
-        val alternate = if (original == AirDirectSettingsProtocol.HAPTICS_HIGH) {
-            AirDirectSettingsProtocol.HAPTICS_LOW
-        } else {
+
+        // Clean single-pulse mechanism:
+        // When band is HIGH or LOW, writing OFF is completely silent (no motor pulse).
+        // Then restoring to original triggers exactly one physical vibration confirmation!
+        // If band was originally OFF, pulse HIGH (vibrates) and restore to OFF (silent).
+        val prepValue = if (original == AirDirectSettingsProtocol.HAPTICS_OFF) {
             AirDirectSettingsProtocol.HAPTICS_HIGH
+        } else {
+            AirDirectSettingsProtocol.HAPTICS_OFF
         }
 
         var chain = Single.just(Unit)
@@ -43,7 +48,7 @@ class HapticPatternRunner(
             chain = chain.flatMap {
                 val before = if (group == 0) 0L else pattern.betweenGroupDelaysMillis[group - 1]
                 Single.timer(before, TimeUnit.MILLISECONDS, scheduler).flatMap {
-                    client.write(alternate).flatMap {
+                    client.write(prepValue).flatMap {
                         Single.timer(pattern.restoreDelayMillis, TimeUnit.MILLISECONDS, scheduler)
                             .flatMap { restoreWrite(original) }
                     }.onErrorResumeNext { error ->
@@ -79,13 +84,13 @@ class HapticPatternRunner(
             if (!allowed()) return@flatMap Single.just(AirHapticExecutionResult(original, original, 0))
             checkpoint(original)
 
-            val alternate = if (original == AirDirectSettingsProtocol.HAPTICS_HIGH) {
-                AirDirectSettingsProtocol.HAPTICS_LOW
-            } else {
+            val prepValue = if (original == AirDirectSettingsProtocol.HAPTICS_OFF) {
                 AirDirectSettingsProtocol.HAPTICS_HIGH
+            } else {
+                AirDirectSettingsProtocol.HAPTICS_OFF
             }
 
-            fun pulse(): Single<Unit> = client.write(alternate).flatMap {
+            fun pulse(): Single<Unit> = client.write(prepValue).flatMap {
                 waitOrStop(pattern.restoreDelayMillis).flatMap { restoreWrite(original) }
             }.onErrorResumeNext { error ->
                 if (error is HapticsRestoreException) Single.error(error)
@@ -97,7 +102,7 @@ class HapticPatternRunner(
                 Timber.d("Air executeRinging pulse: count=%d allowed=%b", count, isAllowed)
                 if (!isAllowed) Single.just(count)
                 else pulse().flatMap {
-                    val gap = if (pattern == AirHapticPattern.CONTINUOUS) 140L else 1_000L
+                    val gap = if (pattern == AirHapticPattern.CONTINUOUS) 800L else 1_200L
                     waitOrStop(gap).flatMap { next(count + 1) }
                 }
             }

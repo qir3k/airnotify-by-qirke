@@ -6,7 +6,7 @@ enum class AirHapticPattern(
     val description: String,
     val groupCount: Int,
     val betweenGroupDelaysMillis: List<Long>,
-    val restoreDelayMillis: Long = 180L
+    val restoreDelayMillis: Long = 80L
 ) {
     SINGLE(
         wireName = "single",
@@ -14,31 +14,31 @@ enum class AirHapticPattern(
         description = "One discrete vibration tap",
         groupCount = 1,
         betweenGroupDelaysMillis = emptyList(),
-        restoreDelayMillis = 180L
+        restoreDelayMillis = 80L
     ),
     DOUBLE(
         wireName = "double",
         displayName = "Double Pulse",
         description = "Two distinct vibration taps",
         groupCount = 2,
-        betweenGroupDelaysMillis = listOf(180L),
-        restoreDelayMillis = 180L
+        betweenGroupDelaysMillis = listOf(450L),
+        restoreDelayMillis = 80L
     ),
     TRIPLE(
         wireName = "triple",
         displayName = "Triple Pulse",
         description = "Three rapid vibration taps",
         groupCount = 3,
-        betweenGroupDelaysMillis = listOf(180L, 180L),
-        restoreDelayMillis = 180L
+        betweenGroupDelaysMillis = listOf(400L, 400L),
+        restoreDelayMillis = 80L
     ),
     URGENT(
         wireName = "urgent",
         displayName = "Urgent Burst",
         description = "Fast, noticeable vibration burst",
         groupCount = 3,
-        betweenGroupDelaysMillis = listOf(120L, 120L),
-        restoreDelayMillis = 150L
+        betweenGroupDelaysMillis = listOf(220L, 220L),
+        restoreDelayMillis = 80L
     ),
     GENTLE(
         wireName = "gentle",
@@ -46,7 +46,7 @@ enum class AirHapticPattern(
         description = "Short subtle tap ideal for hourly chime",
         groupCount = 1,
         betweenGroupDelaysMillis = emptyList(),
-        restoreDelayMillis = 120L
+        restoreDelayMillis = 80L
     ),
     CONTINUOUS(
         wireName = "continuous",
@@ -54,7 +54,7 @@ enum class AirHapticPattern(
         description = "Repeated pulsing until call is answered or silenced",
         groupCount = 1,
         betweenGroupDelaysMillis = emptyList(),
-        restoreDelayMillis = 200L
+        restoreDelayMillis = 80L
     );
 
     companion object {
