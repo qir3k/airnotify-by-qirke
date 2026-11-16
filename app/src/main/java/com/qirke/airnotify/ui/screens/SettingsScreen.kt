@@ -78,7 +78,7 @@ fun SettingsScreen() {
             )
         }
 
-        // --- IN-APP UPDATER CARD (Like SonixLink) ---
+        // --- IN-APP UPDATER CARD ---
         item {
             ElevatedCard(
                 modifier = Modifier.fillMaxWidth(),

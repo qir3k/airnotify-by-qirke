@@ -48,13 +48,13 @@ By default, the official Google Health / Fitbit companion apps only trigger the 
 - **Granular Controls:** Choose exactly what to silence (Mute Notifications, Mute Calls, Mute Chimes).
 - **Live Status on Dashboard:** Displays a sleep status banner when you are in your quiet window with wake time indication.
 
-### 🛡️ Smart Health App Coexistence (Google Health / Pulse)
-A common problem with third-party tools like AirBridge was Bluetooth GATT contention — simultaneous connections would cause `GATT Status 133` errors, breaking Google Health and Pulse sync. AirNotify eliminates this with a 3-layer coexistence system:
-1. **On-Demand Transient Connection:** Never locks the BLE radio. Connects for milliseconds, sends the haptic command, cleanly disconnects, and applies a `250 ms` radio settle buffer.
+### 🛡️ Seamless Google Health Coexistence
+A common problem with earlier bridge tools was Bluetooth GATT contention — continuous connections would cause `GATT Status 133` errors, interfering with Google Health background synchronization. AirNotify is engineered to integrate smoothly with Google Health using a 3-layer coexistence system:
+1. **On-Demand Transient Connection:** Never locks the BLE radio. Connects for milliseconds, sends the haptic command, cleanly disconnects, and applies a `250 ms` radio settle buffer so Google Health has full background access to the band.
 2. **Smart Collision Backoff:** Detects active health sync transfer bursts and safely backs off with exponential delay (`1500 ms`) rather than spamming the radio.
-3. **1-Tap Sync Pause & Quick Launch:** Dedicated card on the Dashboard allows pausing notifications for 5 minutes during manual health data sync, or opening Google Health / Pulse with automatic pause.
+3. **1-Tap Sync Pause & Quick Launch:** Dedicated card on the Dashboard allows pausing notifications for 5 minutes during manual health data sync, or opening Google Health with automatic pause.
 
-### 🔄 In-App Self-Updater (SonixLink-style)
+### 🔄 Built-in In-App Updater
 - **GitHub Releases Integration:** Built-in update checker checks for newer releases from this repository.
 - **Direct Download & Installation:** Downloads the latest APK with live progress and launches Android's Package Installer directly inside the app.
 

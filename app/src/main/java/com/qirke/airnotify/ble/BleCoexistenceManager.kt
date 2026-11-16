@@ -12,24 +12,21 @@ object BleCoexistenceManager {
     /** Delay in milliseconds to allow Android's Bluetooth daemon (Fluoride/BlueDroid) to cleanly flush L2CAP channels after disconnect */
     const val RADIO_SETTLE_MILLIS = 250L
 
-    /** Extended delay when a busy/133 error occurred to allow other companion apps (Google Health / Pulse) to finish their sync transfer */
+    /** Extended delay when a busy/133 error occurred to allow Google Health to finish its background sync transfer */
     const val SYNC_COLLISION_BACKOFF_MILLIS = 1500L
 
     private val isSyncCollisionDetected = AtomicBoolean(false)
     private val lastCollisionTime = AtomicLong(0L)
 
     val KNOWN_HEALTH_APPS = listOf(
-        "com.fitbit.FitbitMobile" to "Fitbit / Google Health",
-        "com.google.android.apps.fitness" to "Google Fit",
-        "com.google.android.apps.healthdata" to "Health Connect",
-        "dev.airpulse.pulse" to "Pulse",
-        "com.airpulse.pulse" to "Pulse"
+        "com.fitbit.FitbitMobile" to "Google Health / Fitbit",
+        "com.google.android.apps.fitness" to "Google Fit"
     )
 
     fun markCollision() {
         isSyncCollisionDetected.set(true)
         lastCollisionTime.set(System.currentTimeMillis())
-        Timber.w("BleCoexistenceManager: Detected BLE conflict with health sync. Applying backoff.")
+        Timber.w("BleCoexistenceManager: Detected BLE conflict with Google Health sync. Applying backoff.")
     }
 
     fun isRecentCollision(): Boolean {

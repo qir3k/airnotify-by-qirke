@@ -437,7 +437,7 @@ fun DashboardScreen(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = if (isSyncPaused) "Health Sync Pause Active" else "Health Apps Coexistence",
+                                text = if (isSyncPaused) "Google Health Sync Pause Active" else "Google Health Coexistence",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
@@ -461,9 +461,9 @@ fun DashboardScreen(
                     Text(
                         text = if (isSyncPaused) {
                             val remainMin = (prefs.getSyncPauseRemainingMillis() / 60_000L) + 1
-                            "Alerts are paused for ~${remainMin} min so Google Health or Pulse can sync without Bluetooth conflicts."
+                            "Alerts are paused for ~${remainMin} min so Google Health can sync without Bluetooth conflicts."
                         } else {
-                            "AirNotify connects on-demand and immediately frees Bluetooth for Google Health & Pulse. If sync ever gets stuck, pause alerts for 5 min."
+                            "AirNotify connects on-demand and immediately frees Bluetooth for Google Health. If sync ever gets stuck, pause alerts for 5 min."
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
