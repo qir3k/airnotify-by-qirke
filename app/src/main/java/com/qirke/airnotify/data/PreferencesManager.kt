@@ -23,6 +23,8 @@ class PreferencesManager(context: Context) {
         private const val KEY_AUTO_CHECK_UPDATES = "auto_check_updates"
         private const val KEY_SYNC_PAUSE_UNTIL = "sync_pause_until"
         private const val KEY_COEXISTENCE_GUARD = "coexistence_guard"
+        private const val KEY_ONLY_WHEN_SCREEN_OFF_NOTIFICATIONS = "only_screen_off_notifications"
+        private const val KEY_ONLY_WHEN_SCREEN_OFF_CALLS = "only_screen_off_calls"
 
         @Volatile
         private var instance: PreferencesManager? = null
@@ -191,6 +193,20 @@ class PreferencesManager(context: Context) {
 
     fun setCoexistenceGuardEnabled(enabled: Boolean) {
         prefs.edit().putBoolean(KEY_COEXISTENCE_GUARD, enabled).apply()
+    }
+
+    fun isOnlyWhenScreenOffForNotifications(): Boolean =
+        prefs.getBoolean(KEY_ONLY_WHEN_SCREEN_OFF_NOTIFICATIONS, true)
+
+    fun setOnlyWhenScreenOffForNotifications(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_ONLY_WHEN_SCREEN_OFF_NOTIFICATIONS, enabled).apply()
+    }
+
+    fun isOnlyWhenScreenOffForCalls(): Boolean =
+        prefs.getBoolean(KEY_ONLY_WHEN_SCREEN_OFF_CALLS, true)
+
+    fun setOnlyWhenScreenOffForCalls(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_ONLY_WHEN_SCREEN_OFF_CALLS, enabled).apply()
     }
 
     fun pauseForSync(durationMinutes: Int = 5) {

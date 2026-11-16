@@ -31,6 +31,13 @@ class PhoneCallReceiver : BroadcastReceiver() {
                     return
                 }
 
+                // Check screen off / phone in use filter for calls
+                if (prefs.isOnlyWhenScreenOffForCalls() && com.qirke.airnotify.util.DeviceStateHelper.isPhoneInActiveUse(context)) {
+                    Timber.d("Incoming call vibration skipped: phone is actively in use (unlocked)")
+                    prefs.addLog("Call", "Skipped band vibration (phone is in active use)")
+                    return
+                }
+
                 val incomingNumber = intent.getStringExtra(TelephonyManager.EXTRA_INCOMING_NUMBER)
                 val contactName = ContactHelper.resolveContactName(context, incomingNumber)
                 val callerIdentity = contactName ?: incomingNumber ?: "Incoming Call"

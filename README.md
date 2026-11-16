@@ -1,7 +1,7 @@
 # AirNotify by qirke ⚡
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/qir3k/airnotify-by-qirke/main/docs/logo.png" width="128" height="128" alt="AirNotify Logo" />
+  <img src="docs/logo.png" width="128" height="128" alt="AirNotify Logo" />
 </p>
 
 <p align="center">
@@ -47,6 +47,11 @@ By default, the official Google Health / Fitbit companion apps only trigger the 
 - **Universal Silence Across All Features:** Automatically mutes App Notifications, Phone Calls, and Hourly Chimes during your sleep window, while keeping all of them active at all other times.
 - **Granular Controls:** Choose exactly what to silence (Mute Notifications, Mute Calls, Mute Chimes).
 - **Live Status on Dashboard:** Displays a sleep status banner when you are in your quiet window with wake time indication.
+
+### 📴 Screen State & Pocket Mode (Alert Only When Screen is Off)
+- **Zero Duplicate Buzzes (Default ON):** Vibrates your band only when your phone is locked or screen is off (e.g. phone in your pocket or resting on a table).
+- **Intelligent In-Use Detection:** When you are actively holding and using your phone with the screen unlocked, band vibrations are suppressed so you aren't annoyed by redundant wrist buzzes.
+- **Granular Toggles:** Customize independently for App Notifications and Incoming Phone Calls directly on the Dashboard, Calls tab, or Settings.
 
 ### 🛡️ Seamless Google Health Coexistence
 A common problem with earlier bridge tools was Bluetooth GATT contention — continuous connections would cause `GATT Status 133` errors, interfering with Google Health background synchronization. AirNotify is engineered to integrate smoothly with Google Health using a 3-layer coexistence system:

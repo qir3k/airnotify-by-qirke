@@ -43,6 +43,8 @@ fun DashboardScreen(
     var logs by remember { mutableStateOf(prefs.getLogs()) }
     var isSyncPaused by remember { mutableStateOf(prefs.isSyncPaused()) }
     var quietConfig by remember { mutableStateOf(prefs.getQuietHoursConfig()) }
+    var onlyScreenOffNotifications by remember { mutableStateOf(prefs.isOnlyWhenScreenOffForNotifications()) }
+    var onlyScreenOffCalls by remember { mutableStateOf(prefs.isOnlyWhenScreenOffForCalls()) }
     val installedHealthApps = remember { BleCoexistenceManager.findInstalledHealthApps(context) }
 
     val isVibrating by AirBridgeService.isVibratingFlow.collectAsState()
@@ -54,6 +56,8 @@ fun DashboardScreen(
         deviceConfig = prefs.getDeviceConfig()
         isSyncPaused = prefs.isSyncPaused()
         quietConfig = prefs.getQuietHoursConfig()
+        onlyScreenOffNotifications = prefs.isOnlyWhenScreenOffForNotifications()
+        onlyScreenOffCalls = prefs.isOnlyWhenScreenOffForCalls()
     }
 
     LazyColumn(
@@ -401,6 +405,111 @@ fun DashboardScreen(
                                 }
                             )
                         }
+                    }
+                }
+            }
+        }
+
+        // Screen State & Pocket Mode Card
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.PhoneAndroid,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = "Alert Only When Screen is Off",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = if (onlyScreenOffNotifications && onlyScreenOffCalls) {
+                                    "Active (skips vibration while using phone)"
+                                } else if (onlyScreenOffNotifications || onlyScreenOffCalls) {
+                                    "Partially active"
+                                } else {
+                                    "Always vibrates (even when screen is in use)"
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = "Vibrates your band only when your phone is locked or in your pocket. Skips vibrations when you are actively using your phone so you don't get interrupted.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                val next = !onlyScreenOffNotifications
+                                onlyScreenOffNotifications = next
+                                prefs.setOnlyWhenScreenOffForNotifications(next)
+                            }
+                            .padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Mute app notifications when screen is active",
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Switch(
+                            checked = onlyScreenOffNotifications,
+                            onCheckedChange = {
+                                onlyScreenOffNotifications = it
+                                prefs.setOnlyWhenScreenOffForNotifications(it)
+                            }
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                val next = !onlyScreenOffCalls
+                                onlyScreenOffCalls = next
+                                prefs.setOnlyWhenScreenOffForCalls(next)
+                            }
+                            .padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Mute incoming calls when phone is in use",
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Switch(
+                            checked = onlyScreenOffCalls,
+                            onCheckedChange = {
+                                onlyScreenOffCalls = it
+                                prefs.setOnlyWhenScreenOffForCalls(it)
+                            }
+                        )
                     }
                 }
             }

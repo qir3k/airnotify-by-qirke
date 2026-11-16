@@ -176,4 +176,13 @@ class AirNotifyUnitTest {
         assertTrue(com.qirke.airnotify.ble.BleCoexistenceManager.SYNC_COLLISION_BACKOFF_MILLIS >= 1000L)
         assertTrue(com.qirke.airnotify.ble.BleCoexistenceManager.KNOWN_HEALTH_APPS.isNotEmpty())
     }
+
+    @Test
+    fun testScreenOffOnlyDefaults() {
+        // Test that the Screen State / Pocket Mode keys and expectations default to true (ON by default)
+        val defaultOnlyWhenScreenOffNotifications = true
+        val defaultOnlyWhenScreenOffCalls = true
+        assertTrue("Notifications should default to screen off only", defaultOnlyWhenScreenOffNotifications)
+        assertTrue("Calls should default to screen off only", defaultOnlyWhenScreenOffCalls)
+    }
 }

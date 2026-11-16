@@ -56,6 +56,8 @@ fun SettingsScreen() {
     var downloadedApk by remember { mutableStateOf<File?>(null) }
     var autoCheckUpdates by remember { mutableStateOf(prefs.isAutoCheckUpdatesEnabled()) }
     var coexistenceGuard by remember { mutableStateOf(prefs.isCoexistenceGuardEnabled()) }
+    var onlyScreenOffNotifications by remember { mutableStateOf(prefs.isOnlyWhenScreenOffForNotifications()) }
+    var onlyScreenOffCalls by remember { mutableStateOf(prefs.isOnlyWhenScreenOffForCalls()) }
 
     LazyColumn(
         modifier = Modifier
@@ -404,6 +406,123 @@ fun SettingsScreen() {
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
+            }
+        }
+
+        // --- SCREEN STATE & POCKET MODE CARD ---
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.PhoneAndroid,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = "Alert Only When Screen is Off",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Vibrate band only when phone is locked or in pocket",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = "Prevents duplicate alerts on your wrist while you are actively holding and using your phone. Saves band battery.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Notifications Toggle
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                val next = !onlyScreenOffNotifications
+                                onlyScreenOffNotifications = next
+                                prefs.setOnlyWhenScreenOffForNotifications(next)
+                            }
+                            .padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "App Notifications",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = if (onlyScreenOffNotifications) "Vibrates only when phone is not in use" else "Always vibrates on every notification",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = onlyScreenOffNotifications,
+                            onCheckedChange = {
+                                onlyScreenOffNotifications = it
+                                prefs.setOnlyWhenScreenOffForNotifications(it)
+                            }
+                        )
+                    }
+
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+                    // Calls Toggle
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                val next = !onlyScreenOffCalls
+                                onlyScreenOffCalls = next
+                                prefs.setOnlyWhenScreenOffForCalls(next)
+                            }
+                            .padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Incoming Phone Calls",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = if (onlyScreenOffCalls) "Vibrates only when phone is not in use" else "Always vibrates for incoming calls",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = onlyScreenOffCalls,
+                            onCheckedChange = {
+                                onlyScreenOffCalls = it
+                                prefs.setOnlyWhenScreenOffForCalls(it)
+                            }
+                        )
+                    }
                 }
             }
         }
