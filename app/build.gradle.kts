@@ -26,11 +26,11 @@ android {
     signingConfigs {
         create("release") {
             val keystoreFile = rootProject.file("keystore/release.keystore")
-            if (keystoreFile.exists()) {
+            if (keystoreFile.exists() && keystoreFile.length() > 0L) {
                 storeFile = keystoreFile
-                storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "airnotifypass"
-                keyAlias = System.getenv("KEY_ALIAS") ?: "airnotify"
-                keyPassword = System.getenv("KEY_PASSWORD") ?: "airnotifypass"
+                storePassword = System.getenv("KEYSTORE_PASSWORD")?.takeIf { it.isNotBlank() } ?: "airnotifypass"
+                keyAlias = System.getenv("KEY_ALIAS")?.takeIf { it.isNotBlank() } ?: "airnotify"
+                keyPassword = System.getenv("KEY_PASSWORD")?.takeIf { it.isNotBlank() } ?: "airnotifypass"
             }
         }
     }

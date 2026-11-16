@@ -39,10 +39,14 @@ jobs:
         run: chmod +x gradlew
 
       - name: Configure Keystore from Secret (if set)
-        if: "${{ env.KEYSTORE_BASE64 != '' }}"
         run: |
-          mkdir -p keystore
-          echo "$KEYSTORE_BASE64" | base64 -d > keystore/release.keystore
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "Injecting keystore from repository secret..."
+            mkdir -p keystore
+            echo "$KEYSTORE_BASE64" | base64 -d > keystore/release.keystore
+          else
+            echo "Using checked-in keystore from repository."
+          fi
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
 
