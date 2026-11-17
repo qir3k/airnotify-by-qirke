@@ -1,8 +1,11 @@
 package com.qirke.airnotify.ble
 
 import android.content.Context
+import com.fitbit.bluetooth.fbgatt.BitGattHelper
+import com.fitbit.bluetooth.fbgatt.FitbitGatt
 import com.fitbit.goldengate.GoldenGateConnectionManagerModule
 import com.qirke.airnotify.BuildConfig
+import timber.log.Timber
 import java.util.concurrent.atomic.AtomicBoolean
 
 object AirRuntime {
@@ -20,6 +23,14 @@ object AirRuntime {
                 isBleCentralRole = true
             )
             initialized.set(true)
+            // Immediately stop background scanners:
+            // GoldenGate init starts AlwaysConnectedScanner by default, which runs continuous scans
+            // and reconnects in background, locking out Google Health!
+            // AirNotify connects strictly on-demand when an alert is enqueued.
+            runCatching {
+                val fg = FitbitGatt.getInstance()
+                BitGattHelper.stopAllScanners(fg, context.applicationContext)
+            }
         } catch (throwable: Throwable) {
             initialized.set(false)
             throw throwable

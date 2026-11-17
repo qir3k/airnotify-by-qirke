@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.fitbit.bluetooth.fbgatt.BitGattHelper
 import com.qirke.airnotify.ble.AirHapticPattern
 import com.qirke.airnotify.data.PreferencesManager
 import com.qirke.airnotify.model.DeviceConfig
@@ -266,6 +267,9 @@ fun DashboardScreen(
                             deviceConfig = prefs.getDeviceConfig()
                             if (!enabled) {
                                 AirBridgeService.stopAlerts(context)
+                                deviceConfig.address?.let { addr ->
+                                    BitGattHelper.forceDisconnectBle(context, addr)
+                                }
                             }
                         }
                     )
@@ -352,11 +356,31 @@ fun DashboardScreen(
                                 Text(strings.resumeAlertsNow, style = MaterialTheme.typography.labelSmall)
                             }
                         }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedButton(
+                            onClick = {
+                                AirBridgeService.stopAlerts(context)
+                                deviceConfig.address?.let { addr ->
+                                    BitGattHelper.forceDisconnectBle(context, addr)
+                                }
+                                prefs.addLog("BLE", strings.bandDisconnectedSuccess)
+                                logs = prefs.getLogs()
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.BluetoothDisabled, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(strings.disconnectBandBluetooth, style = MaterialTheme.typography.labelSmall)
+                        }
                     } else {
                         FilledTonalButton(
                             onClick = {
                                 prefs.pauseForSync(5)
                                 AirBridgeService.stopAlerts(context)
+                                deviceConfig.address?.let { addr ->
+                                    BitGattHelper.forceDisconnectBle(context, addr)
+                                }
                                 syncPaused = true
                                 syncRemainingMillis = prefs.getSyncPauseRemainingMillis()
                                 launchHealthApp(context)
@@ -366,6 +390,23 @@ fun DashboardScreen(
                             Icon(Icons.Default.Sync, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(strings.pauseSyncButton, style = MaterialTheme.typography.labelMedium)
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedButton(
+                            onClick = {
+                                AirBridgeService.stopAlerts(context)
+                                deviceConfig.address?.let { addr ->
+                                    BitGattHelper.forceDisconnectBle(context, addr)
+                                }
+                                prefs.addLog("BLE", strings.bandDisconnectedSuccess)
+                                logs = prefs.getLogs()
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.BluetoothDisabled, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(strings.disconnectBandBluetooth, style = MaterialTheme.typography.labelSmall)
                         }
                     }
                 }

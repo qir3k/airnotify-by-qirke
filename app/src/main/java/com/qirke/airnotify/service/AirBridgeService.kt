@@ -166,6 +166,18 @@ class AirBridgeService : Service() {
             } catch (e: Exception) {
                 Timber.w(e, "Unable to stop alerts via intent")
             }
+            // Synchronously ensure BLE force disconnect and scanner stoppage
+            val prefs = PreferencesManager.getInstance(context)
+            val address = prefs.getDeviceConfig().address
+            if (AirRuntime.isInitialized()) {
+                runCatching {
+                    val fg = FitbitGatt.getInstance()
+                    BitGattHelper.clearConnections(fg, context)
+                }
+            }
+            if (!address.isNullOrBlank()) {
+                BitGattHelper.forceDisconnectBle(context, address)
+            }
         }
     }
 
@@ -212,11 +224,12 @@ class AirBridgeService : Service() {
             if (AirRuntime.isInitialized()) {
                 runCatching {
                     val fg = FitbitGatt.getInstance()
-                    fg.cancelScan(this)
-                    fg.cancelPeriodicalScan(this)
-                    fg.cancelHighPriorityScan(this)
-                    BitGattHelper.clearConnections(fg)
+                    BitGattHelper.clearConnections(fg, this)
                 }
+            }
+            val pairedAddress = PreferencesManager.getInstance(this).getDeviceConfig().address
+            if (!pairedAddress.isNullOrBlank()) {
+                BitGattHelper.forceDisconnectBle(this, pairedAddress)
             }
             releaseWakeLock()
             updateStatus("Alerts stopped (Radio released)")
@@ -479,6 +492,8 @@ class AirBridgeService : Service() {
 
         existing?.let {
             Timber.i("Closing prior connection for %s", normalizedAddress)
+            runCatching { it.gatt?.disconnect() }
+            runCatching { it.disconnect() }
             runCatching { it.close() }
             BitGattHelper.removeConnectionForAddress(fitbitGatt, normalizedAddress)
         }
@@ -618,14 +633,11 @@ class AirBridgeService : Service() {
             p
         }
         return NativePeerCleanup.close {
-            peer?.disconnect(false)
+            peer?.disconnect(true)
             if (AirRuntime.isInitialized()) {
                 runCatching {
                     val fg = FitbitGatt.getInstance()
-                    fg.cancelScan(this)
-                    fg.cancelPeriodicalScan(this)
-                    fg.cancelHighPriorityScan(this)
-                    BitGattHelper.clearConnections(fg)
+                    BitGattHelper.clearConnections(fg, this)
                 }
             }
         }
@@ -633,15 +645,13 @@ class AirBridgeService : Service() {
 
     private fun releasePeer() {
         activeEndpoint = null
-        activePeer?.disconnect(false)
+        val peer = activePeer
         activePeer = null
+        peer?.disconnect(true)
         if (AirRuntime.isInitialized()) {
             runCatching {
                 val fg = FitbitGatt.getInstance()
-                fg.cancelScan(this)
-                fg.cancelPeriodicalScan(this)
-                fg.cancelHighPriorityScan(this)
-                BitGattHelper.clearConnections(fg)
+                BitGattHelper.clearConnections(fg, this)
             }
         }
     }
