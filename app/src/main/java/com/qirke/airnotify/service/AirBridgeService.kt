@@ -156,6 +156,17 @@ class AirBridgeService : Service() {
                 }
             } catch (_: Exception) {}
         }
+
+        fun stopAlerts(context: Context) {
+            val intent = Intent(context, AirBridgeService::class.java).apply {
+                action = ACTION_STOP_ALL
+            }
+            try {
+                context.startService(intent)
+            } catch (e: Exception) {
+                Timber.w(e, "Unable to stop alerts via intent")
+            }
+        }
     }
 
     @SuppressLint("ForegroundServiceType")
@@ -197,8 +208,25 @@ class AirBridgeService : Service() {
             callGeneration++
             isCallRinging = false
             queue.clear()
-            updateStatus("Alerts stopped")
-            if (!processing) processNext()
+            releasePeer()
+            if (AirRuntime.isInitialized()) {
+                runCatching {
+                    val fg = FitbitGatt.getInstance()
+                    fg.cancelScan(this)
+                    fg.cancelPeriodicalScan(this)
+                    fg.cancelHighPriorityScan(this)
+                    BitGattHelper.clearConnections(fg)
+                }
+            }
+            releaseWakeLock()
+            updateStatus("Alerts stopped (Radio released)")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                stopForeground(STOP_FOREGROUND_REMOVE)
+            } else {
+                @Suppress("DEPRECATION")
+                stopForeground(true)
+            }
+            stopSelf()
             return START_NOT_STICKY
         }
 
@@ -415,42 +443,20 @@ class AirBridgeService : Service() {
                 return@flatMap AirHapticPatternExecutor.checkConnection(endpoint).timeout(12, TimeUnit.SECONDS)
             }
 
-            val pending = PendingHapticRecovery.get(this, address)
-            val ready = if (pending != null) {
-                Timber.w("Recovering previous vibration setting before pulsing (pending=%d)", pending)
-                val safePending = if (pending == AirDirectSettingsProtocol.HAPTICS_LOW) {
-                    AirDirectSettingsProtocol.HAPTICS_LOW
-                } else {
-                    AirDirectSettingsProtocol.HAPTICS_HIGH
-                }
-                AirHapticPatternExecutor.recover(endpoint, safePending) {
-                    PendingHapticRecovery.clear(this, address)
-                }.onErrorResumeNext {
-                    PendingHapticRecovery.clear(this, address)
-                    Single.just(Unit)
-                }
+            updateStatus("Connected! Vibrating ${trigger.pattern.displayName}...")
+
+            val execution = if (trigger.isCall && trigger.isContinuousCall) {
+                AirHapticPatternExecutor.executeRinging(
+                    endpoint,
+                    trigger.pattern,
+                    shouldContinue = { isCallRinging && (SystemClock.elapsedRealtime() - callRingStartTime < 60_000L) },
+                    maxDurationMillis = 60_000L
+                )
             } else {
-                Single.just(Unit)
+                AirHapticPatternExecutor.execute(endpoint, trigger.pattern)
             }
 
-            ready.flatMap {
-                updateStatus("Connected! Vibrating ${trigger.pattern.displayName}...")
-                val checkpoint: (Int) -> Unit = { PendingHapticRecovery.mark(this, address, it) }
-                val verified = { PendingHapticRecovery.clear(this, address) }
-
-                if (trigger.isCall && trigger.isContinuousCall) {
-                    AirHapticPatternExecutor.executeRinging(
-                        endpoint,
-                        trigger.pattern,
-                        shouldContinue = { isCallRinging && (SystemClock.elapsedRealtime() - callRingStartTime < 60_000L) },
-                        maxDurationMillis = 60_000L,
-                        checkpoint = checkpoint,
-                        verified = verified
-                    )
-                } else {
-                    AirHapticPatternExecutor.execute(endpoint, trigger.pattern, checkpoint, verified)
-                }
-            }.timeout(if (trigger.isCall && trigger.isContinuousCall) 70L else 25L, TimeUnit.SECONDS)
+            execution.timeout(if (trigger.isCall && trigger.isContinuousCall) 70L else 25L, TimeUnit.SECONDS)
         }.flatMap { result ->
             releasePeerAndWait().andThen(Single.timer(BleCoexistenceManager.RADIO_SETTLE_MILLIS, TimeUnit.MILLISECONDS).map { result })
         }
@@ -614,7 +620,13 @@ class AirBridgeService : Service() {
         return NativePeerCleanup.close {
             peer?.disconnect(false)
             if (AirRuntime.isInitialized()) {
-                runCatching { BitGattHelper.clearConnections(FitbitGatt.getInstance()) }
+                runCatching {
+                    val fg = FitbitGatt.getInstance()
+                    fg.cancelScan(this)
+                    fg.cancelPeriodicalScan(this)
+                    fg.cancelHighPriorityScan(this)
+                    BitGattHelper.clearConnections(fg)
+                }
             }
         }
     }
@@ -623,6 +635,15 @@ class AirBridgeService : Service() {
         activeEndpoint = null
         activePeer?.disconnect(false)
         activePeer = null
+        if (AirRuntime.isInitialized()) {
+            runCatching {
+                val fg = FitbitGatt.getInstance()
+                fg.cancelScan(this)
+                fg.cancelPeriodicalScan(this)
+                fg.cancelHighPriorityScan(this)
+                BitGattHelper.clearConnections(fg)
+            }
+        }
     }
 
     private fun formatFriendlyError(trigger: AirNotificationTrigger, throwable: Throwable): String {

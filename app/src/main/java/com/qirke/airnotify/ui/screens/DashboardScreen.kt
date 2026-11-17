@@ -1,5 +1,7 @@
 package com.qirke.airnotify.ui.screens
 
+import android.content.Context
+import android.content.Intent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -30,6 +32,8 @@ import com.qirke.airnotify.ui.i18n.LocalStrings
 import com.qirke.airnotify.ui.i18n.localizedName
 import com.qirke.airnotify.ui.theme.StatusGreen
 import com.qirke.airnotify.ui.theme.StatusRed
+import kotlinx.coroutines.delay
+import timber.log.Timber
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -45,14 +49,31 @@ fun DashboardScreen(
     var deviceConfig by remember { mutableStateOf(prefs.getDeviceConfig()) }
     var logs by remember { mutableStateOf(prefs.getLogs()) }
     var showScanDialog by remember { mutableStateOf(false) }
+    var syncPaused by remember { mutableStateOf(prefs.isSyncPaused()) }
+    var syncRemainingMillis by remember { mutableStateOf(prefs.getSyncPauseRemainingMillis()) }
 
     val isVibrating by AirBridgeService.isVibratingFlow.collectAsState()
     val liveStatus by AirBridgeService.currentStatusFlow.collectAsState()
+
+    // Countdown timer effect for sync pause
+    LaunchedEffect(syncPaused) {
+        while (syncPaused) {
+            val rem = prefs.getSyncPauseRemainingMillis()
+            syncRemainingMillis = rem
+            if (rem <= 0L) {
+                syncPaused = false
+                break
+            }
+            delay(1000L)
+        }
+    }
 
     // Refresh state when liveStatus changes
     LaunchedEffect(liveStatus) {
         logs = prefs.getLogs()
         deviceConfig = prefs.getDeviceConfig()
+        syncPaused = prefs.isSyncPaused()
+        syncRemainingMillis = prefs.getSyncPauseRemainingMillis()
     }
 
     if (showScanDialog) {
@@ -240,11 +261,113 @@ fun DashboardScreen(
 
                     Switch(
                         checked = deviceConfig.masterEnabled,
-                        onCheckedChange = {
-                            prefs.setMasterEnabled(it)
+                        onCheckedChange = { enabled ->
+                            prefs.setMasterEnabled(enabled)
                             deviceConfig = prefs.getDeviceConfig()
+                            if (!enabled) {
+                                AirBridgeService.stopAlerts(context)
+                            }
                         }
                     )
+                }
+            }
+        }
+
+        // --- 2.5 GOOGLE HEALTH COEXISTENCE & SYNC CARD ---
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (syncPaused) {
+                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
+                    } else {
+                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    }
+                )
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Sync,
+                            contentDescription = null,
+                            tint = if (syncPaused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = strings.coexistenceTitle,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = strings.syncCooldownNote,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    if (syncPaused) {
+                        val minutes = (syncRemainingMillis / 1000) / 60
+                        val seconds = (syncRemainingMillis / 1000) % 60
+                        val timeStr = String.format(Locale.getDefault(), "%d:%02d", minutes, seconds)
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(
+                                    text = String.format(strings.pauseSyncActive, timeStr),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                                )
+                            }
+
+                            Button(
+                                onClick = {
+                                    prefs.clearSyncPause()
+                                    syncPaused = false
+                                    syncRemainingMillis = 0L
+                                }
+                            ) {
+                                Text(strings.resumeAlertsNow, style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
+                    } else {
+                        FilledTonalButton(
+                            onClick = {
+                                prefs.pauseForSync(5)
+                                AirBridgeService.stopAlerts(context)
+                                syncPaused = true
+                                syncRemainingMillis = prefs.getSyncPauseRemainingMillis()
+                                launchHealthApp(context)
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.Sync, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(strings.pauseSyncButton, style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
                 }
             }
         }
@@ -268,25 +391,24 @@ fun DashboardScreen(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Test Wrist Vibrations",
+                            text = strings.testVibration,
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold
                         )
                     }
-                    Text(
-                        text = "Tap any pattern to test physical vibration on your Fitbit Air:",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 4.dp, bottom = 12.dp)
-                    )
 
                     FlowRow(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 12.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         listOf(
                             AirHapticPattern.SINGLE,
+                            AirHapticPattern.DOUBLE,
+                            AirHapticPattern.TRIPLE,
+                            AirHapticPattern.GENTLE,
                             AirHapticPattern.HEARTBEAT,
                             AirHapticPattern.SYNCOPATED,
                             AirHapticPattern.URGENT,
@@ -411,6 +533,27 @@ fun LogItemRow(log: LogEntry) {
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurface
                 )
+            }
+        }
+    }
+}
+
+private fun launchHealthApp(context: Context) {
+    val pm = context.packageManager
+    val packages = listOf(
+        "com.fitbit.FitbitMobile",
+        "com.google.android.apps.fitness",
+        "com.google.android.apps.healthdata"
+    )
+    for (pkg in packages) {
+        val launchIntent = pm.getLaunchIntentForPackage(pkg)
+        if (launchIntent != null) {
+            launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            try {
+                context.startActivity(launchIntent)
+                return
+            } catch (e: Exception) {
+                Timber.w(e, "Failed to launch health package: %s", pkg)
             }
         }
     }

@@ -28,8 +28,8 @@ object AirHapticPatternExecutor {
         pattern: AirHapticPattern,
         shouldContinue: () -> Boolean,
         maxDurationMillis: Long = 60_000L,
-        checkpoint: (Int) -> Unit,
-        verified: () -> Unit
+        checkpoint: (Int) -> Unit = {},
+        verified: () -> Unit = {}
     ): Single<AirHapticExecutionResult> =
         HapticPatternRunner(CoapSettingsClient(endpoint), checkpoint = checkpoint, verified = verified)
             .executeRinging(pattern, shouldContinue, maxDurationMillis)
